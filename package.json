@@ -32,7 +32,6 @@
     "@types/crypto-js": "^4.2.2",
     "@vercel/analytics": "^1.5.0",
     "@videojs/themes": "^1.0.1",
-    "sqlite3": "^5.1.6",
     "body-parser": "^1.20.3",
     "cors": "^2.8.5",
     "crypto-js": "^4.2.0",

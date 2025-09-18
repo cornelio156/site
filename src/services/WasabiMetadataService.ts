@@ -79,11 +79,11 @@ class WasabiMetadataService {
       
       // Inicializar wasabiService se necessário
       await wasabiService.initialize({
-        accessKey: '03AFIL7RED0GENX84KDT',
-        secretKey: 'XMrGmC2R25GRTASbUssLkjz5Zr8UsfeyZ9zVgbGy',
-        region: 'eu-central-2',
-        bucket: 'videosfolder',
-        endpoint: 'https://s3.eu-central-2.wasabisys.com'
+        accessKey: import.meta.env.VITE_WASABI_ACCESS_KEY || '',
+        secretKey: import.meta.env.VITE_WASABI_SECRET_KEY || '',
+        region: import.meta.env.VITE_WASABI_REGION || '',
+        bucket: import.meta.env.VITE_WASABI_BUCKET || '',
+        endpoint: import.meta.env.VITE_WASABI_ENDPOINT || ''
       });
       
       // Obter URL assinada para o arquivo de metadados
@@ -127,11 +127,11 @@ class WasabiMetadataService {
           emailPass: '',
           emailFrom: '',
           wasabiConfig: {
-            accessKey: '03AFIL7RED0GENX84KDT',
-            secretKey: 'XMrGmC2R25GRTASbUssLkjz5Zr8UsfeyZ9zVgbGy',
-            region: 'eu-central-2',
-            bucket: 'videosfolder',
-            endpoint: 'https://s3.eu-central-2.wasabisys.com'
+            accessKey: import.meta.env.VITE_WASABI_ACCESS_KEY || '',
+            secretKey: import.meta.env.VITE_WASABI_SECRET_KEY || '',
+            region: import.meta.env.VITE_WASABI_REGION || '',
+            bucket: import.meta.env.VITE_WASABI_BUCKET || '',
+            endpoint: import.meta.env.VITE_WASABI_ENDPOINT || ''
           }
         }
       };
@@ -148,13 +148,13 @@ class WasabiMetadataService {
     try {
       console.log('Saving metadata to Wasabi...');
       
-      // Inicializar wasabiService se necessário
+       // Inicializar wasabiService se necessário
       await wasabiService.initialize({
-        accessKey: '03AFIL7RED0GENX84KDT',
-        secretKey: 'XMrGmC2R25GRTASbUssLkjz5Zr8UsfeyZ9zVgbGy',
-        region: 'eu-central-2',
-        bucket: 'videosfolder',
-        endpoint: 'https://s3.eu-central-2.wasabisys.com'
+        accessKey: import.meta.env.VITE_WASABI_ACCESS_KEY || '',
+        secretKey: import.meta.env.VITE_WASABI_SECRET_KEY || '',
+        region: import.meta.env.VITE_WASABI_REGION || '',
+        bucket: import.meta.env.VITE_WASABI_BUCKET || '',
+        endpoint: import.meta.env.VITE_WASABI_ENDPOINT || ''
       });
       
       // Converter dados para JSON

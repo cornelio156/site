@@ -1,0 +1,23 @@
+{
+  "siteName": "VideosPlus",
+  "paypalClientId": "",
+  "paypalMeUsername": "",
+  "stripePublishableKey": "",
+  "stripeSecretKey": "",
+  "telegramUsername": "",
+  "videoListTitle": "Available Videos",
+  "crypto": [],
+  "emailHost": "smtp.gmail.com",
+  "emailPort": "587",
+  "emailSecure": false,
+  "emailUser": "",
+  "emailPass": "",
+  "emailFrom": "",
+  "wasabiConfig": {
+    "accessKey": "",
+    "secretKey": "",
+    "region": "",
+    "bucket": "",
+    "endpoint": ""
+  }
+}

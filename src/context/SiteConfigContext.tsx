@@ -76,9 +76,9 @@ const SiteConfigContext = createContext<SiteConfigContextType>({
   wasabiConfig: {
     accessKey: '',
     secretKey: '',
-    region: 'eu-central-2',
-    bucket: 'videosfolder',
-    endpoint: 'https://s3.eu-central-2.wasabisys.com'
+    region: '',
+    bucket: '',
+    endpoint: ''
   },
   siteConfig: null,
   loading: false,
@@ -164,9 +164,9 @@ export const SiteConfigProvider = ({ children }: { children: ReactNode }) => {
           wasabi_config: {
             accessKey: '',
             secretKey: '',
-            region: 'eu-central-2',
-            bucket: 'videosfolder',
-            endpoint: 'https://s3.eu-central-2.wasabisys.com'
+            region: '',
+            bucket: '',
+            endpoint: ''
           }
         };
         setConfig(defaultConfig);
@@ -234,9 +234,9 @@ export const SiteConfigProvider = ({ children }: { children: ReactNode }) => {
     wasabiConfig: config?.wasabi_config || {
       accessKey: '',
       secretKey: '',
-      region: 'eu-central-2',
-      bucket: 'videosfolder',
-      endpoint: 'https://s3.eu-central-2.wasabisys.com'
+      region: '',
+      bucket: '',
+      endpoint: ''
     },
     siteConfig: config,
     loading,

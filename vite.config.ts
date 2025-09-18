@@ -18,6 +18,12 @@ export default defineConfig(({ mode }) => {
       'process.env.VITE_API_URL': JSON.stringify(env.VITE_API_URL || ''),
       'process.env.VITE_APPWRITE_PROJECT_ID': JSON.stringify(env.VITE_APPWRITE_PROJECT_ID || ''),
       'process.env.VITE_APPWRITE_API_KEY': JSON.stringify(env.VITE_APPWRITE_API_KEY || ''),
+      // Wasabi configuration
+      'import.meta.env.VITE_WASABI_ACCESS_KEY': JSON.stringify(env.VITE_WASABI_ACCESS_KEY || ''),
+      'import.meta.env.VITE_WASABI_SECRET_KEY': JSON.stringify(env.VITE_WASABI_SECRET_KEY || ''),
+      'import.meta.env.VITE_WASABI_REGION': JSON.stringify(env.VITE_WASABI_REGION || ''),
+      'import.meta.env.VITE_WASABI_BUCKET': JSON.stringify(env.VITE_WASABI_BUCKET || ''),
+      'import.meta.env.VITE_WASABI_ENDPOINT': JSON.stringify(env.VITE_WASABI_ENDPOINT || ''),
     },
     server: {
       // Configure a middleware for handling API requests during development

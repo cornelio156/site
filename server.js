@@ -1,10 +1,13 @@
+import dotenv from 'dotenv';
+dotenv.config();
+
 import express from 'express';
 import cors from 'cors';
 import { promises as fs } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import apiRoutes from './api-routes.js';
-import { sqliteDatabaseService } from './server/services/SQLiteDatabaseService.js';
+// SQLite removido - usando Wasabi como fonte principal
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -91,11 +94,11 @@ async function initializeDataFiles() {
       emailPass: '',
       emailFrom: '',
       wasabiConfig: {
-        accessKey: '',
-        secretKey: '',
-        region: 'eu-central-2',
-        bucket: 'videosfolder',
-        endpoint: 'https://s3.eu-central-2.wasabisys.com'
+        accessKey: process.env.VITE_WASABI_ACCESS_KEY || '',
+        secretKey: process.env.VITE_WASABI_SECRET_KEY || '',
+        region: process.env.VITE_WASABI_REGION || '',
+        bucket: process.env.VITE_WASABI_BUCKET || '',
+        endpoint: process.env.VITE_WASABI_ENDPOINT || ''
       }
     }}
   ];
@@ -143,54 +146,7 @@ if (process.env.NODE_ENV === 'production') {
 // Inicializar e iniciar servidor
 async function startServer() {
   try {
-    // Inicializar SQLite database
-    await sqliteDatabaseService.initialize();
-    console.log('SQLite database initialized');
-    
-    // Inicializar configuração do site se não existir
-    const siteConfig = await sqliteDatabaseService.getSiteConfig();
-    if (!siteConfig) {
-      console.log('Inicializando configuração padrão do site...');
-      const defaultConfig = {
-        siteName: 'VideosPlus',
-        paypalClientId: '',
-        paypalMeUsername: '',
-        stripePublishableKey: '',
-        stripeSecretKey: '',
-        telegramUsername: 'nlyadm19',
-        videoListTitle: 'Available Videos',
-        crypto: [],
-        emailHost: 'smtp.gmail.com',
-        emailPort: '587',
-        emailSecure: false,
-        emailUser: '',
-        emailPass: '',
-        emailFrom: '',
-        wasabiConfig: {
-          accessKey: '03AFIL7RED0GENX84KDT',
-          secretKey: 'XMrGmC2R25GRTASbUssLkjz5Zr8UsfeyZ9zVgbGy',
-          region: 'eu-central-2',
-          bucket: 'videosfolder',
-          endpoint: 'https://s3.eu-central-2.wasabisys.com'
-        }
-      };
-      await sqliteDatabaseService.updateSiteConfig(defaultConfig);
-      console.log('Configuração padrão do site criada');
-    }
-    
-    // Criar usuário admin se não existir
-    const adminUser = await sqliteDatabaseService.getUserByEmail('admin@gmail.com');
-    if (!adminUser) {
-      console.log('Criando usuário admin...');
-      const crypto = await import('crypto');
-      const adminUserData = {
-        email: 'admin@gmail.com',
-        name: 'Administrador',
-        password: crypto.createHash('sha256').update('admin123').digest('hex')
-      };
-      await sqliteDatabaseService.createUser(adminUserData);
-      console.log('Usuário admin criado: admin@gmail.com / admin123');
-    }
+    console.log('Iniciando servidor com Wasabi como fonte principal...');
     
     // Inicializar arquivos de dados (para compatibilidade)
     await initializeDataFiles();
@@ -248,11 +204,11 @@ async function startServer() {
                 emailPass: '',
                 emailFrom: '',
                 wasabiConfig: {
-                  accessKey: '03AFIL7RED0GENX84KDT',
-                  secretKey: 'XMrGmC2R25GRTASbUssLkjz5Zr8UsfeyZ9zVgbGy',
-                  region: 'eu-central-2',
-                  bucket: 'videosfolder',
-                  endpoint: 'https://s3.eu-central-2.wasabisys.com'
+                  accessKey: process.env.VITE_WASABI_ACCESS_KEY || '',
+                  secretKey: process.env.VITE_WASABI_SECRET_KEY || '',
+                  region: process.env.VITE_WASABI_REGION || '',
+                  bucket: process.env.VITE_WASABI_BUCKET || '',
+                  endpoint: process.env.VITE_WASABI_ENDPOINT || ''
                 }
               }
             };
@@ -272,7 +228,7 @@ async function startServer() {
               console.log('Dados iniciais incluídos:');
               console.log('- Usuário admin: admin@gmail.com / admin123');
               console.log('- Configuração do site: VideosPlus');
-              console.log('- Configuração Wasabi: videosfolder');
+              console.log('- Configuração Wasabi:', process.env.VITE_WASABI_BUCKET || 'não configurado');
             } else {
               console.log('Erro ao criar arquivo JSON inicial no Wasabi');
             }

@@ -231,9 +231,9 @@ export const wasabiService = new WasabiService();
 export const defaultWasabiConfig: WasabiConfig = {
   accessKey: '',
   secretKey: '',
-  region: 'eu-central-2',
-  bucket: 'videosfolder',
-  endpoint: 'https://s3.eu-central-2.wasabisys.com'
+  region: '',
+  bucket: '',
+  endpoint: ''
 };
 
 export default WasabiService;

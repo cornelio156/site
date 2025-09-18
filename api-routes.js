@@ -7,7 +7,7 @@ import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } fro
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import multer from 'multer';
 import Stripe from 'stripe';
-import { sqliteDatabaseService } from './server/services/SQLiteDatabaseService.js';
+import { wasabiBackendService } from './server/services/WasabiBackendService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -97,7 +97,7 @@ async function writeJsonFile(filePath, data) {
 // GET /api/videos/health - Verificar integridade dos dados
 router.get('/videos/health', async (req, res) => {
   try {
-    const videos = await sqliteDatabaseService.getAllVideos();
+    const videos = await wasabiBackendService.getAllVideos();
     
     // Verificar integridade básica
     const healthCheck = {
@@ -151,8 +151,7 @@ router.get('/videos/health', async (req, res) => {
 // GET /api/videos - Obter todos os vídeos
 router.get('/videos', async (req, res) => {
   try {
-    await sqliteDatabaseService.initialize();
-    const videos = await sqliteDatabaseService.getAllVideos();
+    const videos = await wasabiBackendService.getAllVideos();
     res.json(videos);
   } catch (error) {
     console.error('Error fetching videos:', error);
@@ -163,8 +162,7 @@ router.get('/videos', async (req, res) => {
 // GET /api/videos/:id - Obter vídeo por ID
 router.get('/videos/:id', async (req, res) => {
   try {
-    await sqliteDatabaseService.initialize();
-    const video = await sqliteDatabaseService.getVideo(req.params.id);
+    const video = await wasabiBackendService.getVideo(req.params.id);
     
     if (!video) {
       return res.status(404).json({ error: 'Video not found' });
@@ -180,7 +178,6 @@ router.get('/videos/:id', async (req, res) => {
 // POST /api/videos - Criar novo vídeo
 router.post('/videos', async (req, res) => {
   try {
-    await sqliteDatabaseService.initialize();
     const newVideo = req.body;
     
     // Validar campos obrigatórios
@@ -191,15 +188,7 @@ router.post('/videos', async (req, res) => {
       }
     }
     
-    const createdVideo = await sqliteDatabaseService.createVideo(newVideo);
-    
-    // Fazer backup automático após criar vídeo
-    try {
-      await sqliteDatabaseService.backupToWasabi();
-      console.log('Backup automático realizado após criar vídeo');
-    } catch (backupError) {
-      console.warn('Erro no backup automático:', backupError.message);
-    }
+    const createdVideo = await wasabiBackendService.createVideo(newVideo);
     
     console.log(`Video ${createdVideo.id} created successfully`);
     res.status(201).json(createdVideo);
@@ -212,7 +201,6 @@ router.post('/videos', async (req, res) => {
 // PUT /api/videos/:id - Atualizar vídeo
 router.put('/videos/:id', async (req, res) => {
   try {
-    await sqliteDatabaseService.initialize();
     const updates = req.body;
     
     // Filtrar apenas campos válidos para atualização
@@ -229,18 +217,10 @@ router.put('/videos/:id', async (req, res) => {
       }
     }
     
-    const updatedVideo = await sqliteDatabaseService.updateVideo(req.params.id, validUpdates);
+    const updatedVideo = await wasabiBackendService.updateVideo(req.params.id, validUpdates);
     
     if (!updatedVideo) {
       return res.status(404).json({ error: 'Video not found' });
-    }
-    
-    // Fazer backup automático após atualizar vídeo
-    try {
-      await sqliteDatabaseService.backupToWasabi();
-      console.log('Backup automático realizado após atualizar vídeo');
-    } catch (backupError) {
-      console.warn('Erro no backup automático:', backupError.message);
     }
     
     console.log(`Video ${req.params.id} updated successfully`);
@@ -254,19 +234,10 @@ router.put('/videos/:id', async (req, res) => {
 // DELETE /api/videos/:id - Deletar vídeo
 router.delete('/videos/:id', async (req, res) => {
   try {
-    await sqliteDatabaseService.initialize();
-    const success = await sqliteDatabaseService.deleteVideo(req.params.id);
+    const success = await wasabiBackendService.deleteVideo(req.params.id);
     
     if (!success) {
       return res.status(404).json({ error: 'Video not found' });
-    }
-    
-    // Fazer backup automático após deletar vídeo
-    try {
-      await sqliteDatabaseService.backupToWasabi();
-      console.log('Backup automático realizado após deletar vídeo');
-    } catch (backupError) {
-      console.warn('Erro no backup automático:', backupError.message);
     }
     
     res.json({ success: true, message: 'Video deleted successfully' });
@@ -279,8 +250,8 @@ router.delete('/videos/:id', async (req, res) => {
 // POST /api/videos/:id/views - Incrementar visualizações
 router.post('/videos/:id/views', async (req, res) => {
   try {
-    await sqliteDatabaseService.incrementVideoViews(req.params.id);
-    const video = await sqliteDatabaseService.getVideo(req.params.id);
+    await wasabiBackendService.incrementVideoViews(req.params.id);
+    const video = await wasabiBackendService.getVideo(req.params.id);
     
     if (!video) {
       return res.status(404).json({ error: 'Video not found' });
@@ -298,7 +269,7 @@ router.post('/videos/:id/views', async (req, res) => {
 // GET /api/users - Obter todos os usuários
 router.get('/users', async (req, res) => {
   try {
-    const users = await sqliteDatabaseService.getAllUsers();
+    const users = await wasabiBackendService.getAllUsers();
     res.json(users);
   } catch (error) {
     console.error('Error fetching users:', error);
@@ -309,7 +280,7 @@ router.get('/users', async (req, res) => {
 // GET /api/users/:id - Obter usuário por ID
 router.get('/users/:id', async (req, res) => {
   try {
-    const user = await sqliteDatabaseService.getUser(req.params.id);
+    const user = await wasabiBackendService.getUser(req.params.id);
     
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
@@ -325,7 +296,7 @@ router.get('/users/:id', async (req, res) => {
 // GET /api/users/email/:email - Obter usuário por email
 router.get('/users/email/:email', async (req, res) => {
   try {
-    const user = await sqliteDatabaseService.getUserByEmail(req.params.email);
+    const user = await wasabiBackendService.getUserByEmail(req.params.email);
     
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
@@ -341,7 +312,7 @@ router.get('/users/email/:email', async (req, res) => {
 // POST /api/users - Criar novo usuário
 router.post('/users', async (req, res) => {
   try {
-    const newUser = await sqliteDatabaseService.createUser(req.body);
+    const newUser = await wasabiBackendService.createUser(req.body);
     res.status(201).json(newUser);
   } catch (error) {
     console.error('Error creating user:', error);
@@ -352,7 +323,7 @@ router.post('/users', async (req, res) => {
 // PUT /api/users/:id - Atualizar usuário
 router.put('/users/:id', async (req, res) => {
   try {
-    const updatedUser = await sqliteDatabaseService.updateUser(req.params.id, req.body);
+    const updatedUser = await wasabiBackendService.updateUser(req.params.id, req.body);
     
     if (!updatedUser) {
       return res.status(404).json({ error: 'User not found' });
@@ -368,7 +339,7 @@ router.put('/users/:id', async (req, res) => {
 // DELETE /api/users/:id - Deletar usuário
 router.delete('/users/:id', async (req, res) => {
   try {
-    const success = await sqliteDatabaseService.deleteUser(req.params.id);
+    const success = await wasabiBackendService.deleteUser(req.params.id);
     
     if (!success) {
       return res.status(404).json({ error: 'User not found' });
@@ -386,7 +357,7 @@ router.delete('/users/:id', async (req, res) => {
 // GET /api/sessions/token/:token - Obter sessão por token
 router.get('/sessions/token/:token', async (req, res) => {
   try {
-    const session = await sqliteDatabaseService.getSessionByToken(req.params.token);
+    const session = await wasabiBackendService.getSessionByToken(req.params.token);
     
     if (!session) {
       return res.status(404).json({ error: 'Session not found' });
@@ -402,7 +373,7 @@ router.get('/sessions/token/:token', async (req, res) => {
 // POST /api/sessions - Criar nova sessão
 router.post('/sessions', async (req, res) => {
   try {
-    const newSession = await sqliteDatabaseService.createSession(req.body);
+    const newSession = await wasabiBackendService.createSession(req.body);
     res.status(201).json(newSession);
   } catch (error) {
     console.error('Error creating session:', error);
@@ -413,7 +384,7 @@ router.post('/sessions', async (req, res) => {
 // PUT /api/sessions/:id - Atualizar sessão
 router.put('/sessions/:id', async (req, res) => {
   try {
-    const updatedSession = await sqliteDatabaseService.updateSession(req.params.id, req.body);
+    const updatedSession = await wasabiBackendService.updateSession(req.params.id, req.body);
     
     if (!updatedSession) {
       return res.status(404).json({ error: 'Session not found' });
@@ -429,7 +400,7 @@ router.put('/sessions/:id', async (req, res) => {
 // DELETE /api/sessions/:id - Deletar sessão
 router.delete('/sessions/:id', async (req, res) => {
   try {
-    const success = await sqliteDatabaseService.deleteSession(req.params.id);
+    const success = await wasabiBackendService.deleteSession(req.params.id);
     
     if (!success) {
       return res.status(404).json({ error: 'Session not found' });
@@ -475,7 +446,7 @@ router.get('/signed-url/:fileId', async (req, res) => {
       return res.status(400).json({ error: 'File ID is required' });
     }
 
-    const siteConfig = await sqliteDatabaseService.getSiteConfig();
+    const siteConfig = await wasabiBackendService.getSiteConfig();
     const wasabiConfig = siteConfig.wasabiConfig;
 
     if (!wasabiConfig || !wasabiConfig.accessKey || !wasabiConfig.secretKey) {
@@ -520,7 +491,7 @@ router.get('/signed-url/:fileId', async (req, res) => {
 // GET /api/site-config - Obter configurações do site
 router.get('/site-config', async (req, res) => {
   try {
-    const config = await sqliteDatabaseService.getSiteConfig();
+    const config = await wasabiBackendService.getSiteConfig();
     res.json(config);
   } catch (error) {
     console.error('Error fetching site config:', error);
@@ -531,7 +502,7 @@ router.get('/site-config', async (req, res) => {
 // PUT /api/site-config - Atualizar configurações do site
 router.put('/site-config', async (req, res) => {
   try {
-    const config = await sqliteDatabaseService.updateSiteConfig(req.body);
+    const config = await wasabiBackendService.updateSiteConfig(req.body);
     res.json(config);
   } catch (error) {
     console.error('Error updating site config:', error);
@@ -548,7 +519,7 @@ router.post('/create-checkout-session', async (req, res) => {
       return res.status(400).json({ error: 'Missing required parameters' });
     }
 
-    const siteConfig = await sqliteDatabaseService.getSiteConfig();
+    const siteConfig = await wasabiBackendService.getSiteConfig();
     const stripeSecretKey = siteConfig.stripeSecretKey;
 
     if (!stripeSecretKey) {
@@ -621,7 +592,7 @@ router.delete('/delete-file/:fileId', async (req, res) => {
       return res.status(400).json({ error: 'File ID is required' });
     }
 
-    const siteConfig = await sqliteDatabaseService.getSiteConfig();
+    const siteConfig = await wasabiBackendService.getSiteConfig();
     const wasabiConfig = siteConfig.wasabiConfig;
 
     if (!wasabiConfig || !wasabiConfig.accessKey || !wasabiConfig.secretKey) {
@@ -661,147 +632,12 @@ router.delete('/delete-file/:fileId', async (req, res) => {
 });
 
 // ===== BACKUP E RESTAURAÇÃO =====
-
-// Fazer backup dos dados para Wasabi
-router.post('/backup', async (req, res) => {
-  try {
-    console.log('Iniciando backup dos dados...');
-    
-    // Fazer backup dos dados
-    const backupData = await sqliteDatabaseService.backupToWasabi();
-    
-    // Salvar backup no Wasabi
-    const siteConfig = await sqliteDatabaseService.getSiteConfig();
-    const wasabiConfig = siteConfig.wasabiConfig;
-
-    if (!wasabiConfig || !wasabiConfig.accessKey || !wasabiConfig.secretKey) {
-      return res.status(500).json({ error: 'Wasabi configuration not found' });
-    }
-
-    const s3Client = new S3Client({
-      region: wasabiConfig.region,
-      endpoint: wasabiConfig.endpoint,
-      credentials: {
-        accessKeyId: wasabiConfig.accessKey,
-        secretAccessKey: wasabiConfig.secretKey,
-      },
-      forcePathStyle: true,
-    });
-
-    // Upload do backup para Wasabi
-    const backupKey = `metadata/backup-${Date.now()}.json`;
-    const uploadCommand = new PutObjectCommand({
-      Bucket: wasabiConfig.bucket,
-      Key: backupKey,
-      Body: JSON.stringify(backupData, null, 2),
-      ContentType: 'application/json',
-    });
-
-    await s3Client.send(uploadCommand);
-
-    // Salvar referência do backup mais recente
-    const latestBackupKey = `metadata/latest-backup.json`;
-    const latestBackupCommand = new PutObjectCommand({
-      Bucket: wasabiConfig.bucket,
-      Key: latestBackupKey,
-      Body: JSON.stringify({
-        backupKey,
-        backupDate: backupData.backupDate,
-        version: backupData.version
-      }, null, 2),
-      ContentType: 'application/json',
-    });
-
-    await s3Client.send(latestBackupCommand);
-
-    res.json({
-      success: true,
-      message: 'Backup criado com sucesso',
-      backupKey,
-      backupDate: backupData.backupDate
-    });
-
-  } catch (error) {
-    console.error('Erro ao fazer backup:', error);
-    res.status(500).json({ 
-      error: 'Failed to create backup',
-      details: error.message 
-    });
-  }
-});
-
-// Restaurar dados do Wasabi
-router.post('/restore', async (req, res) => {
-  try {
-    console.log('Iniciando restauração dos dados...');
-    
-    const siteConfig = await sqliteDatabaseService.getSiteConfig();
-    const wasabiConfig = siteConfig.wasabiConfig;
-
-    if (!wasabiConfig || !wasabiConfig.accessKey || !wasabiConfig.secretKey) {
-      return res.status(500).json({ error: 'Wasabi configuration not found' });
-    }
-
-    const s3Client = new S3Client({
-      region: wasabiConfig.region,
-      endpoint: wasabiConfig.endpoint,
-      credentials: {
-        accessKeyId: wasabiConfig.accessKey,
-        secretAccessKey: wasabiConfig.secretKey,
-      },
-      forcePathStyle: true,
-    });
-
-    // Buscar o backup mais recente
-    const latestBackupKey = `metadata/latest-backup.json`;
-    const getLatestCommand = new GetObjectCommand({
-      Bucket: wasabiConfig.bucket,
-      Key: latestBackupKey,
-    });
-
-    try {
-      const latestBackupResponse = await s3Client.send(getLatestCommand);
-      const latestBackupData = JSON.parse(await latestBackupResponse.Body.transformToString());
-      
-      // Buscar o backup completo
-      const getBackupCommand = new GetObjectCommand({
-        Bucket: wasabiConfig.bucket,
-        Key: latestBackupData.backupKey,
-      });
-
-      const backupResponse = await s3Client.send(getBackupCommand);
-      const backupData = JSON.parse(await backupResponse.Body.transformToString());
-
-      // Restaurar dados
-      await sqliteDatabaseService.restoreFromWasabi(backupData);
-
-      res.json({
-        success: true,
-        message: 'Dados restaurados com sucesso',
-        restoredDate: backupData.backupDate
-      });
-
-    } catch (backupError) {
-      console.error('Erro ao buscar backup do Wasabi:', backupError);
-      res.status(404).json({ 
-        error: 'Backup not found in Wasabi',
-        details: backupError.message 
-      });
-    }
-
-  } catch (error) {
-    console.error('Erro ao restaurar dados:', error);
-    res.status(500).json({ 
-      error: 'Failed to restore data',
-      details: error.message 
-    });
-  }
-});
+// Removido - usando Wasabi diretamente como fonte principal
 
 // Verificar status do backup
 router.get('/backup/status', async (req, res) => {
   try {
-    const siteConfig = await sqliteDatabaseService.getSiteConfig();
+    const siteConfig = await wasabiBackendService.getSiteConfig();
     const wasabiConfig = siteConfig.wasabiConfig;
 
     if (!wasabiConfig || !wasabiConfig.accessKey || !wasabiConfig.secretKey) {
@@ -860,7 +696,7 @@ router.post('/upload/metadata', upload.single('file'), async (req, res) => {
     }
 
     // Carregar configurações do Wasabi
-    const siteConfig = await sqliteDatabaseService.getSiteConfig();
+    const siteConfig = await wasabiBackendService.getSiteConfig();
     const wasabiConfig = siteConfig.wasabiConfig;
 
     if (!wasabiConfig || !wasabiConfig.accessKey || !wasabiConfig.secretKey) {
@@ -913,7 +749,7 @@ router.post('/upload/:folder', upload.single('file'), async (req, res) => {
     }
 
     // Carregar configurações do Wasabi
-    const siteConfig = await sqliteDatabaseService.getSiteConfig();
+    const siteConfig = await wasabiBackendService.getSiteConfig();
     const wasabiConfig = siteConfig.wasabiConfig;
 
     if (!wasabiConfig || !wasabiConfig.accessKey || !wasabiConfig.secretKey) {
