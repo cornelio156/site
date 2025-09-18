@@ -1,0 +1,48 @@
+:root {
+  font-family: 'Roboto', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  
+  color-scheme: light dark;
+  
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+// Theme variables
+$dark-bg: #121212;
+$dark-paper: #1e1e1e;
+$light-bg: #f5f5f5;
+$light-paper: #ffffff;
+$primary-color: #ff0000;
+$secondary-color: #b71c1c;
+$text-light: #ffffff;
+$text-dark: #212121;
+
+// Dark theme specific styles
+.dark-theme {
+  background-color: $dark-bg;
+  color: $text-light;
+  
+  .MuiPaper-root {
+    background-color: $dark-paper;
+  }
+}
+
+// Light theme specific styles
+.light-theme {
+  background-color: $light-bg;
+  color: $text-dark;
+  
+  .MuiPaper-root {
+    background-color: $light-paper;
+  }
+} 

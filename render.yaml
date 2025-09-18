@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: videosplus
+    env: node
+    plan: free
+    buildCommand: npm ci && npm run build:render
+    startCommand: npm start
+    healthCheckPath: /api
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: VITE_API_URL
+        value: https://videosplus.onrender.com

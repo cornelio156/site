@@ -1,0 +1,22 @@
+{
+  "rewrites": [
+    { "source": "/admin", "destination": "/" },
+    { "source": "/login", "destination": "/" },
+    { "source": "/videos", "destination": "/" },
+    { "source": "/video/:id", "destination": "/" },
+    { "source": "/(.*)", "destination": "/" }
+  ],
+  "functions": {
+    "api/create-checkout-session.js": {
+      "memory": 1024,
+      "maxDuration": 10
+    },
+    "api/setup.js": {
+      "memory": 1024,
+      "maxDuration": 30
+    }
+  },
+  "env": {
+    "APPWRITE_ENDPOINT": "https://fra.cloud.appwrite.io/v1"
+  }
+}
