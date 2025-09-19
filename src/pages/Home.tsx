@@ -60,6 +60,68 @@ const VideoCardSkeleton: FC = () => {
   );
 };
 
+// Loading card component with progress indicator
+const VideoCardLoading: FC<{ index: number }> = ({ index }) => {
+  return (
+    <Card sx={{ 
+      height: '100%', 
+      display: 'flex', 
+      flexDirection: 'column',
+      borderRadius: '8px',
+      overflow: 'hidden',
+      boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+      bgcolor: 'background.paper',
+      position: 'relative'
+    }}>
+      {/* Thumbnail area with progress indicator */}
+      <Box sx={{ 
+        width: '100%', 
+        paddingTop: '56.25%', 
+        position: 'relative',
+        bgcolor: 'rgba(0,0,0,0.05)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+      }}>
+        <Box sx={{ 
+          display: 'flex', 
+          flexDirection: 'column', 
+          alignItems: 'center',
+          gap: 2
+        }}>
+          <CircularProgress 
+            size={40} 
+            thickness={4}
+            sx={{ 
+              color: 'primary.main',
+              animation: 'pulse 1.5s ease-in-out infinite'
+            }} 
+          />
+          <Typography 
+            variant="caption" 
+            sx={{ 
+              color: 'text.secondary',
+              fontWeight: 'bold',
+              textAlign: 'center'
+            }}
+          >
+            Loading video {index + 1}...
+          </Typography>
+        </Box>
+      </Box>
+      
+      <CardContent>
+        <Skeleton variant="text" sx={{ fontSize: '1.5rem', mb: 1 }} />
+        <Skeleton variant="text" sx={{ fontSize: '1rem', width: '60%' }} />
+        <Box sx={{ mt: 2, display: 'flex', justifyContent: 'space-between' }}>
+          <Skeleton variant="text" sx={{ width: '30%' }} />
+          <Skeleton variant="text" sx={{ width: '20%' }} />
+        </Box>
+      </CardContent>
+    </Card>
+  );
+};
+
 const Home: FC = () => {
   const [videos, setVideos] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
@@ -83,22 +145,26 @@ const Home: FC = () => {
         setLoading(true);
         setError(null);
         setLoadedVideos([]); // Reset loaded videos
+        setVideos([]); // Reset videos array
         
-        const { videos: videoList, totalPages: pages } = await VideoService.getVideosWithPagination(
-          page,
-          videosPerPage,
-          SortOption.NEWEST
-        );
+        // Get video IDs first (ultra-fast operation - no metadata loading)
+        const allVideoIds = await VideoService.getVideoIds(SortOption.NEWEST);
+        const totalPages = Math.ceil(allVideoIds.length / videosPerPage);
+        setTotalPages(totalPages);
         
-        setVideos(videoList);
-        setTotalPages(pages);
+        // Get video IDs for current page
+        const startIndex = (page - 1) * videosPerPage;
+        const endIndex = startIndex + videosPerPage;
+        const pageVideoIds = allVideoIds.slice(startIndex, endIndex);
         
-        // Load videos progressively
-        loadVideosProgressively(videoList);
+        // Set loading to false immediately so skeletons show
+        setLoading(false);
+        
+        // Load videos one by one, starting immediately
+        loadVideosOneByOne(pageVideoIds);
       } catch (err) {
         console.error('Error fetching videos:', err);
         setError('Failed to load videos. Please try again later.');
-      } finally {
         setLoading(false);
       }
     };
@@ -109,18 +175,31 @@ const Home: FC = () => {
     setShowSetupButton(false);
   }, [user, page]);
 
-  // Function to load videos progressively
-  const loadVideosProgressively = async (videoList: Video[]) => {
+  // Function to load videos one by one (immediate first video)
+  const loadVideosOneByOne = async (videoIds: string[]) => {
     setIsLoadingMore(true);
     
-    for (let i = 0; i < videoList.length; i++) {
-      const video = videoList[i];
+    for (let i = 0; i < videoIds.length; i++) {
+      const videoId = videoIds[i];
       
-      // Add a small delay between each video to create a smooth loading effect
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      // Add the video to the loaded list
-      setLoadedVideos(prev => [...prev, video]);
+      try {
+        // Load individual video
+        const video = await VideoService.getVideo(videoId);
+        
+        if (video) {
+          // Add video immediately to both arrays
+          setLoadedVideos(prev => [...prev, video]);
+          setVideos(prev => [...prev, video]);
+        }
+        
+        // Add a small delay between videos (except for the first one)
+        if (i > 0) {
+          await new Promise(resolve => setTimeout(resolve, 150));
+        }
+      } catch (error) {
+        console.error(`Error loading video ${videoId}:`, error);
+        // Continue with next video even if current one fails
+      }
     }
     
     setIsLoadingMore(false);
@@ -148,12 +227,28 @@ const Home: FC = () => {
 
   // Render skeleton loaders during loading state
   const renderSkeletons = () => {
-    const remainingVideos = videos.length - loadedVideos.length;
-    const skeletonCount = Math.max(0, remainingVideos);
+    // Show skeletons for videos that haven't loaded yet
+    const totalExpectedVideos = videosPerPage;
+    const loadedCount = loadedVideos.length;
+    const skeletonCount = Math.max(0, totalExpectedVideos - loadedCount);
     
     return Array(skeletonCount).fill(0).map((_, index) => (
       <Grid item key={`skeleton-${index}`} xs={12} sm={6} md={4} lg={3}>
         <VideoCardSkeleton />
+      </Grid>
+    ));
+  };
+
+  // Render loading cards with progress indicators
+  const renderLoadingCards = () => {
+    // Show loading cards for videos that are currently being loaded
+    const totalExpectedVideos = videosPerPage;
+    const loadedCount = loadedVideos.length;
+    const loadingCount = Math.max(0, totalExpectedVideos - loadedCount);
+    
+    return Array(loadingCount).fill(0).map((_, index) => (
+      <Grid item key={`loading-${index}`} xs={12} sm={6} md={4} lg={3}>
+        <VideoCardLoading index={loadedCount + index} />
       </Grid>
     ));
   };
@@ -381,13 +476,13 @@ const Home: FC = () => {
           </Alert>
         )}
         
-        <Fade in={!loading} timeout={500}>
+        <Fade in={true} timeout={500}>
           <Box>
             {loading ? (
               <Grid container spacing={3}>
                 {renderSkeletons()}
               </Grid>
-            ) : videos.length === 0 ? (
+            ) : videos.length === 0 && !isLoadingMore ? (
               <Grow in={true} timeout={1000}>
                 <Alert 
                   severity="info" 
@@ -410,7 +505,7 @@ const Home: FC = () => {
                     <Grow
                       key={video.$id}
                       in={true}
-                      timeout={300}
+                      timeout={200}
                     >
                       <Grid item xs={12} sm={6} md={4} lg={3}>
                         <VideoCard video={video} />
@@ -418,8 +513,8 @@ const Home: FC = () => {
                     </Grow>
                   ))}
                   
-                  {/* Show skeleton loaders for remaining videos */}
-                  {isLoadingMore && renderSkeletons()}
+                  {/* Show loading cards with progress indicators for remaining videos */}
+                  {isLoadingMore && renderLoadingCards()}
                 </Grid>
                 
                 {totalPages > 1 && (

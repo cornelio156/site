@@ -4,7 +4,7 @@ import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import CardMedia from '@mui/material/CardMedia';
 import Typography from '@mui/material/Typography';
-import { Chip } from '@mui/material';
+import { Chip, CircularProgress } from '@mui/material';
 import Box from '@mui/material/Box';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
@@ -31,6 +31,8 @@ interface VideoCardProps {
 const VideoCard: FC<VideoCardProps> = ({ video }) => {
   const navigate = useNavigate();
   const [isHovered, setIsHovered] = useState(false);
+  const [isThumbnailLoading, setIsThumbnailLoading] = useState(true);
+  const [thumbnailError, setThumbnailError] = useState(false);
   
   const handleCardClick = async () => {
     try {
@@ -105,31 +107,63 @@ const VideoCard: FC<VideoCardProps> = ({ video }) => {
   // Ajuste para lidar com formato created_at ou createdAt
   const createdAtField = video.createdAt || video.created_at;
 
+  // Handle thumbnail loading states
+  useEffect(() => {
+    if (video.thumbnailUrl) {
+      setIsThumbnailLoading(true);
+      setThumbnailError(false);
+    } else {
+      setIsThumbnailLoading(false);
+    }
+  }, [video.thumbnailUrl]);
+
+  const handleThumbnailLoad = () => {
+    setIsThumbnailLoading(false);
+  };
+
+  const handleThumbnailError = () => {
+    setIsThumbnailLoading(false);
+    setThumbnailError(true);
+  };
+
   return (
-    <Card 
-      sx={{ 
-        height: '100%', 
-        display: 'flex', 
-        flexDirection: 'column',
-        transition: 'all 0.3s ease',
-        borderRadius: '12px',
-        overflow: 'hidden',
-        boxShadow: theme => `0 8px 20px ${theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.4)' : 'rgba(0,0,0,0.15)'}`,
-        cursor: 'pointer',
-        backgroundColor: theme => theme.palette.mode === 'dark' ? '#121212' : '#ffffff',
-        border: '1px solid rgba(255,15,80,0.1)',
-        '&:hover': {
-          transform: 'translateY(-10px) scale(1.02)',
-          boxShadow: '0 16px 30px rgba(0,0,0,0.25)',
-          borderColor: '#FF0F50',
-        }
-      }}
-      onClick={handleCardClick}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-    >
+    <>
+      {/* Add CSS animation for pulse effect */}
+      <style>
+        {`
+          @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+          }
+        `}
+      </style>
+      
+      <Card 
+        sx={{ 
+          height: '100%', 
+          display: 'flex', 
+          flexDirection: 'column',
+          transition: 'all 0.3s ease',
+          borderRadius: '12px',
+          overflow: 'hidden',
+          boxShadow: theme => `0 8px 20px ${theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.4)' : 'rgba(0,0,0,0.15)'}`,
+          cursor: 'pointer',
+          backgroundColor: theme => theme.palette.mode === 'dark' ? '#121212' : '#ffffff',
+          border: '1px solid rgba(255,15,80,0.1)',
+          '&:hover': {
+            transform: 'translateY(-10px) scale(1.02)',
+            boxShadow: '0 16px 30px rgba(0,0,0,0.25)',
+            borderColor: '#FF0F50',
+          }
+        }}
+        onClick={handleCardClick}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+      >
       <Box sx={{ position: 'relative', paddingTop: '56.25%' /* 16:9 aspect ratio */ }}>
-        {video.thumbnailUrl ? (
+        {/* Thumbnail image */}
+        {video.thumbnailUrl && !thumbnailError ? (
           <CardMedia
             component="img"
             image={video.thumbnailUrl}
@@ -144,11 +178,8 @@ const VideoCard: FC<VideoCardProps> = ({ video }) => {
               backgroundColor: '#0A0A0A',
               filter: 'brightness(0.9)',
             }}
-            onError={(e) => {
-              // Fallback if image fails to load
-              const target = e.target as HTMLImageElement;
-              target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjE4MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMzAwIiBoZWlnaHQ9IjE4MCIgZmlsbD0iI2Y1ZjVmNSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM5OTk5OTkiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5BZHVsdCBDb250ZW50PC90ZXh0Pjwvc3ZnPg==';
-            }}
+            onLoad={handleThumbnailLoad}
+            onError={handleThumbnailError}
           />
         ) : (
           <Skeleton 
@@ -163,6 +194,76 @@ const VideoCard: FC<VideoCardProps> = ({ video }) => {
             }} 
             animation="wave" 
           />
+        )}
+
+        {/* Loading indicator overlay */}
+        {isThumbnailLoading && video.thumbnailUrl && (
+          <Box
+            sx={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              backgroundColor: 'rgba(0,0,0,0.7)',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 3,
+            }}
+          >
+            <CircularProgress 
+              size={40} 
+              thickness={4}
+              sx={{ 
+                color: '#FF0F50',
+                mb: 1,
+                animation: 'pulse 1.5s ease-in-out infinite'
+              }} 
+            />
+            <Typography 
+              variant="caption" 
+              sx={{ 
+                color: 'white',
+                fontWeight: 'bold',
+                textAlign: 'center',
+                fontSize: '0.75rem'
+              }}
+            >
+              Loading...
+            </Typography>
+          </Box>
+        )}
+
+        {/* Error state overlay */}
+        {thumbnailError && (
+          <Box
+            sx={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              backgroundColor: '#0A0A0A',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 3,
+            }}
+          >
+            <Typography 
+              variant="body2" 
+              sx={{ 
+                color: '#666',
+                textAlign: 'center',
+                fontSize: '0.9rem'
+              }}
+            >
+              Video Thumbnail
+            </Typography>
+          </Box>
         )}
         
         {/* Adult content indicator */}
@@ -326,7 +427,8 @@ const VideoCard: FC<VideoCardProps> = ({ video }) => {
           </Typography>
         </Box>
       </CardContent>
-    </Card>
+      </Card>
+    </>
   );
 };
 
