@@ -69,6 +69,8 @@ const Home: FC = () => {
   const [setupModalOpen, setSetupModalOpen] = useState(false);
   const [showSetupButton, setShowSetupButton] = useState(false);
   const [quickSearchQuery, setQuickSearchQuery] = useState('');
+  const [loadedVideos, setLoadedVideos] = useState<Video[]>([]);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   
   const { user } = useAuth();
   const { videoListTitle } = useSiteConfig();
@@ -80,6 +82,7 @@ const Home: FC = () => {
       try {
         setLoading(true);
         setError(null);
+        setLoadedVideos([]); // Reset loaded videos
         
         const { videos: videoList, totalPages: pages } = await VideoService.getVideosWithPagination(
           page,
@@ -89,6 +92,9 @@ const Home: FC = () => {
         
         setVideos(videoList);
         setTotalPages(pages);
+        
+        // Load videos progressively
+        loadVideosProgressively(videoList);
       } catch (err) {
         console.error('Error fetching videos:', err);
         setError('Failed to load videos. Please try again later.');
@@ -102,6 +108,23 @@ const Home: FC = () => {
     // Sempre mostrar o botão de configuração (não dependemos mais do Appwrite)
     setShowSetupButton(false);
   }, [user, page]);
+
+  // Function to load videos progressively
+  const loadVideosProgressively = async (videoList: Video[]) => {
+    setIsLoadingMore(true);
+    
+    for (let i = 0; i < videoList.length; i++) {
+      const video = videoList[i];
+      
+      // Add a small delay between each video to create a smooth loading effect
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Add the video to the loaded list
+      setLoadedVideos(prev => [...prev, video]);
+    }
+    
+    setIsLoadingMore(false);
+  };
 
   const handlePageChange = (event: React.ChangeEvent<unknown>, value: number) => {
     setPage(value);
@@ -125,7 +148,10 @@ const Home: FC = () => {
 
   // Render skeleton loaders during loading state
   const renderSkeletons = () => {
-    return Array(videosPerPage).fill(0).map((_, index) => (
+    const remainingVideos = videos.length - loadedVideos.length;
+    const skeletonCount = Math.max(0, remainingVideos);
+    
+    return Array(skeletonCount).fill(0).map((_, index) => (
       <Grid item key={`skeleton-${index}`} xs={12} sm={6} md={4} lg={3}>
         <VideoCardSkeleton />
       </Grid>
@@ -149,6 +175,17 @@ const Home: FC = () => {
 
   return (
     <Box sx={{ width: '100%' }}>
+      {/* Add CSS animation for pulse effect */}
+      <style>
+        {`
+          @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+          }
+        `}
+      </style>
+      
       {/* Banner de destaque */}
       <FeaturedBanner onError={handleBannerError} />
       
@@ -238,7 +275,7 @@ const Home: FC = () => {
               {videoListTitle || 'Featured Videos'}
             </Typography>
             {!loading && videos.length > 0 && (
-              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mt: 1 }}>
+              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mt: 1, alignItems: 'center' }}>
                 <Chip 
                   label={`From $${Math.min(...videos.map(v => v.price)).toFixed(2)}`}
                   size="small"
@@ -269,6 +306,21 @@ const Home: FC = () => {
                     border: '1px solid rgba(255, 15, 80, 0.3)'
                   }}
                 />
+                
+                {/* Loading progress indicator */}
+                {isLoadingMore && loadedVideos.length < videos.length && (
+                  <Chip 
+                    label={`Loading ${loadedVideos.length}/${videos.length} videos...`}
+                    size="small"
+                    sx={{ 
+                      backgroundColor: 'rgba(33, 150, 243, 0.1)',
+                      color: '#2196F3',
+                      fontWeight: 'bold',
+                      border: '1px solid rgba(33, 150, 243, 0.3)',
+                      animation: 'pulse 1.5s ease-in-out infinite'
+                    }}
+                  />
+                )}
               </Box>
             )}
           </Box>
@@ -353,17 +405,21 @@ const Home: FC = () => {
             ) : (
               <>
                 <Grid container spacing={3}>
-                  {videos.map((video, index) => (
+                  {/* Show loaded videos with smooth animation */}
+                  {loadedVideos.map((video, index) => (
                     <Grow
                       key={video.$id}
                       in={true}
-                      timeout={500 + index * 100}
+                      timeout={300}
                     >
                       <Grid item xs={12} sm={6} md={4} lg={3}>
                         <VideoCard video={video} />
                       </Grid>
                     </Grow>
                   ))}
+                  
+                  {/* Show skeleton loaders for remaining videos */}
+                  {isLoadingMore && renderSkeletons()}
                 </Grid>
                 
                 {totalPages > 1 && (

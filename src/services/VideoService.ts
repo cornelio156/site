@@ -189,33 +189,43 @@ export class VideoService {
     }
   }
   
-  // Get a single video by ID
+  // Get a single video by ID (optimized for fast loading)
   static async getVideo(videoId: string): Promise<Video | null> {
     try {
+      console.log(`Getting single video ${videoId} (optimized)`);
       const videoData = await jsonDatabaseService.getVideo(videoId);
       
       if (!videoData) {
+        console.log(`Video ${videoId} not found in database`);
         return null;
       }
       
       const video = this.convertVideoData(videoData);
       
-      // Get thumbnail URL
+      // Get thumbnail URL asynchronously (non-blocking)
       const thumbnailId = video.thumbnailFileId || video.thumbnail_id;
       
       if (thumbnailId) {
-        try {
-          video.thumbnailUrl = await wasabiService.getThumbnailUrl(thumbnailId);
-        } catch (error) {
-          console.error(`Error getting thumbnail for video ${video.$id}:`, error);
-          // Use placeholder if thumbnail not available
-          video.thumbnailUrl = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjE4MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMzAwIiBoZWlnaHQ9IjE4MCIgZmlsbD0iI2Y1ZjVmNSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM5OTk5OTkiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5WaWRlbyBUaHVtYm5haWw8L3RleHQ+PC9zdmc+';
-        }
+        // Load thumbnail in background, don't wait for it
+        wasabiService.getThumbnailUrl(thumbnailId)
+          .then(url => {
+            video.thumbnailUrl = url;
+            // Trigger a re-render if needed (optional)
+            console.log(`Thumbnail loaded for video ${video.$id}`);
+          })
+          .catch(error => {
+            console.error(`Error getting thumbnail for video ${video.$id}:`, error);
+            video.thumbnailUrl = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjE4MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMzAwIiBoZWlnaHQ9IjE4MCIgZmlsbD0iI2Y1ZjVmNSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM5OTk5OTkiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5WaWRlbyBUaHVtYm5haWw8L3RleHQ+PC9zdmc+';
+          });
+        
+        // Set a placeholder immediately
+        video.thumbnailUrl = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjE4MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMzAwIiBoZWlnaHQ9IjE4MCIgZmlsbD0iI2Y1ZjVmNSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM5OTk5OTkiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5WaWRlbyBUaHVtYm5haWw8L3RleHQ+PC9zdmc+';
       } else {
         // Use placeholder if no thumbnail ID
         video.thumbnailUrl = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjE4MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMzAwIiBoZWlnaHQ9IjE4MCIgZmlsbD0iI2Y1ZjVmNSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM5OTk5OTkiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5WaWRlbyBUaHVtYm5haWw8L3RleHQ+PC9zdmc+';
       }
       
+      console.log(`Video ${videoId} loaded successfully`);
       return video;
     } catch (error) {
       console.error(`Error getting video ${videoId}:`, error);

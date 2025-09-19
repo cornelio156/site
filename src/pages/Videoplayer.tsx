@@ -146,12 +146,19 @@ const VideoPlayer: FC = () => {
           }
         }
         
-        // Load suggested videos (excluding current video)
-        const allVideos = await VideoService.getAllVideos();
-        const filtered = allVideos
-          .filter(v => v.$id !== id)
-          .slice(0, 8); // Limit to 8 videos
-        setSuggestedVideos(filtered);
+        // Load suggested videos in background (non-blocking)
+        // This will not block the main video from loading
+        VideoService.getAllVideos()
+          .then(allVideos => {
+            const filtered = allVideos
+              .filter(v => v.$id !== id)
+              .slice(0, 8); // Limit to 8 videos
+            setSuggestedVideos(filtered);
+          })
+          .catch(err => {
+            console.error('Error loading suggested videos:', err);
+            // Don't set error state for suggested videos, just log it
+          });
       } catch (err) {
         console.error('Error loading video:', err);
         setError('Failed to load video. Please try again later.');
