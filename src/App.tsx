@@ -85,7 +85,7 @@ const AppContent: FC = () => {
 
   // Controlar quando mostrar o modal de loading
   useEffect(() => {
-    // Sempre mostrar o modal no início e deixar o timer de 15s do próprio modal controlar o fechamento
+    // Sempre mostrar o modal no início e deixar o timer de 25s do próprio modal controlar o fechamento
     setShowLoadingModal(true);
   }, []);
   
