@@ -31,6 +31,7 @@ const LoadingModal: React.FC<LoadingModalProps> = ({ open, onClose }) => {
   useEffect(() => {
     if (!open) return;
 
+    // Sempre aguardar 15 segundos completos, independentemente do estado de carregamento
     const timer = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev <= 1) {

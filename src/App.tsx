@@ -85,18 +85,9 @@ const AppContent: FC = () => {
 
   // Controlar quando mostrar o modal de loading
   useEffect(() => {
-    // Mostrar o modal apenas quando o site está carregando ou por 15 segundos
-    if (loading) {
-      setShowLoadingModal(true);
-    } else {
-      // Quando o loading terminar, aguardar um pouco mais antes de fechar
-      const timer = setTimeout(() => {
-        setShowLoadingModal(false);
-      }, 2000); // 2 segundos adicionais após o loading terminar
-      
-      return () => clearTimeout(timer);
-    }
-  }, [loading]);
+    // Sempre mostrar o modal no início e deixar o timer de 15s do próprio modal controlar o fechamento
+    setShowLoadingModal(true);
+  }, []);
   
   return (
     <Box sx={{ 
