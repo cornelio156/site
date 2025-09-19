@@ -21,11 +21,13 @@ import PaymentNotifications from './components/PaymentNotifications';
 import PrivacyNotice from './components/PrivacyNotice';
 import ScrollToTop from './components/ScrollToTop';
 import CustomAnalytics from './components/CustomAnalytics';
+import LoadingModal from './components/LoadingModal';
 
 // Componente AppContent para usar hooks que dependem do Router
 const AppContent: FC = () => {
-  const { siteName } = useSiteConfig();
+  const { siteName, loading } = useSiteConfig();
   const [showSplash, setShowSplash] = useState(false);
+  const [showLoadingModal, setShowLoadingModal] = useState(true);
   const location = useLocation();
   const enableSplash = false; // feature-flag: disable splash without removing code
   
@@ -75,6 +77,26 @@ const AppContent: FC = () => {
   const handleAnimationComplete = () => {
     setShowSplash(false);
   };
+
+  // Função para fechar o modal de loading
+  const handleLoadingModalClose = () => {
+    setShowLoadingModal(false);
+  };
+
+  // Controlar quando mostrar o modal de loading
+  useEffect(() => {
+    // Mostrar o modal apenas quando o site está carregando ou por 15 segundos
+    if (loading) {
+      setShowLoadingModal(true);
+    } else {
+      // Quando o loading terminar, aguardar um pouco mais antes de fechar
+      const timer = setTimeout(() => {
+        setShowLoadingModal(false);
+      }, 2000); // 2 segundos adicionais após o loading terminar
+      
+      return () => clearTimeout(timer);
+    }
+  }, [loading]);
   
   return (
     <Box sx={{ 
@@ -82,6 +104,7 @@ const AppContent: FC = () => {
       flexDirection: 'column',
       minHeight: '100vh',
     }}>
+      <LoadingModal open={showLoadingModal} onClose={handleLoadingModalClose} />
       {enableSplash && showSplash && <SplashAnimation onAnimationComplete={handleAnimationComplete} />}
       <PrivacyNotice />
       <PaymentNotifications />
