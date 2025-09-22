@@ -7,7 +7,9 @@ import { jsonDatabaseService } from './JSONDatabaseService';
 
 // Base API URL - configurado para desenvolvimento local ou produção
 const isDev = import.meta.env.DEV;
-const API_BASE_URL = isDev ? 'http://localhost:3000' : 'https://omegleleaks.onrender.com';
+const API_BASE_URL = isDev 
+  ? 'http://localhost:3000' 
+  : (import.meta.env.VITE_API_URL || 'https://omegleleaks.onrender.com');
 
 // Helper function to get Stripe secret key from JSON database
 export const getStripeSecretKey = async (): Promise<string> => {
