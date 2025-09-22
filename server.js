@@ -28,26 +28,13 @@ app.use(cors({
       }
     }
     
-    // In production, allow all render.com and vercel.app domains
+    // In production, allow ALL domains - completamente aberto
     if (process.env.NODE_ENV === 'production') {
-      if (origin.includes('.onrender.com') || origin.includes('.vercel.app')) {
-        return callback(null, true);
-      }
-    }
-    
-    // Allow specific known domains
-    const allowedOrigins = [
-      'https://videosplus.onrender.com',
-      'https://videosplus.vercel.app',
-      'https://omegleleaks.onrender.com',
-      'https://previewsleaked.onrender.com'
-    ];
-    
-    if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
     
-    callback(new Error('Not allowed by CORS'));
+    // For any other case, allow the request
+    callback(null, true);
   },
   credentials: true
 }));

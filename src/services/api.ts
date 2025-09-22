@@ -7,9 +7,24 @@ import { jsonDatabaseService } from './JSONDatabaseService';
 
 // Base API URL - configurado para desenvolvimento local ou produção
 const isDev = import.meta.env.DEV;
-const API_BASE_URL = isDev 
-  ? 'http://localhost:3000' 
-  : (import.meta.env.VITE_API_URL || 'https://omegleleaks.onrender.com');
+
+// Função para detectar automaticamente a URL da API baseada no domínio atual
+const getApiBaseUrl = () => {
+  if (isDev) {
+    return 'http://localhost:3000';
+  }
+  
+  // Se VITE_API_URL estiver configurado, use ele
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
+  }
+  
+  // Caso contrário, use o domínio atual como base para a API
+  const currentOrigin = window.location.origin;
+  return currentOrigin;
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 // Helper function to get Stripe secret key from JSON database
 export const getStripeSecretKey = async (): Promise<string> => {
