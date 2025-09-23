@@ -26,7 +26,8 @@ import { useAuth } from '../services/Auth';
 import VideoCard from '../components/VideoCard';
 import { VideoService, Video, SortOption } from '../services/VideoService';
 import { useSiteConfig } from '../context/SiteConfigContext';
-import FeaturedBanner from '../components/FeaturedBanner';
+import TelegramIcon from '@mui/icons-material/Telegram';
+// import FeaturedBanner from '../components/FeaturedBanner'; // Temporarily disabled
 import DatabaseSetupModal from '../components/DatabaseSetupModal';
 import CredentialsStatus from '../components/CredentialsStatus';
 import ContactSection from '../components/ContactSection';
@@ -136,7 +137,7 @@ const Home: FC = () => {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   
   const { user } = useAuth();
-  const { videoListTitle } = useSiteConfig();
+  const { videoListTitle, telegramUsername } = useSiteConfig();
   const navigate = useNavigate();
   const videosPerPage = 24; // Aumentar de 12 para 24 vídeos por página
 
@@ -254,9 +255,9 @@ const Home: FC = () => {
     ));
   };
 
-  const handleBannerError = (errorMsg: string) => {
-    setError(errorMsg);
-  };
+  // const handleBannerError = (errorMsg: string) => {
+  //   setError(errorMsg);
+  // }; // Temporarily disabled with FeaturedBanner
 
   const handleQuickSearch = (event: React.FormEvent) => {
     event.preventDefault();
@@ -267,6 +268,39 @@ const Home: FC = () => {
 
   const handleQuickSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setQuickSearchQuery(event.target.value);
+  };
+
+  const handleTelegramClick = () => {
+    if (telegramUsername) {
+      // Create welcome message for Telegram
+      const welcomeMessage = `
+🎬 *Premium Video Collection*
+
+Welcome to our premium content site!
+
+✨ *What we offer:*
+• Exclusive high-quality videos
+• Secure payments (PayPal, Stripe, Crypto)
+• Instant access after purchase
+• 18+ adult content
+
+🔒 *Privacy and Security:*
+• Encrypted transactions
+• Protected data
+• 24/7 support
+
+💬 *Need help?*
+I'm here to answer your questions about our videos and services!
+
+*Click "View Videos" to start your journey!* 🚀
+      `.trim();
+
+      // Encode message for URL
+      const encodedMessage = encodeURIComponent(welcomeMessage);
+
+      // Open Telegram with pre-formatted message
+      window.open(`https://t.me/${telegramUsername}?text=${encodedMessage}`, '_blank');
+    }
   };
 
   return (
@@ -282,8 +316,8 @@ const Home: FC = () => {
         `}
       </style>
       
-      {/* Banner de destaque */}
-      <FeaturedBanner onError={handleBannerError} />
+      {/* Banner de destaque - Temporarily disabled */}
+      {/* <FeaturedBanner onError={handleBannerError} /> */}
       
       {/* Contador de usuários online */}
       <OnlineUsersCounter 
@@ -292,7 +326,88 @@ const Home: FC = () => {
         size="medium" 
       />
       
-      <Container maxWidth="lg" sx={{ py: 4 }}>
+      <Container maxWidth="lg" sx={{ py: 6 }}>
+        {/* Simple header to replace the banner */}
+        <Box sx={{ 
+          textAlign: 'center', 
+          mb: 6,
+          py: 4,
+          background: 'linear-gradient(135deg, rgba(255, 15, 80, 0.05) 0%, rgba(209, 13, 66, 0.05) 100%)',
+          borderRadius: 2,
+          border: '1px solid rgba(255, 15, 80, 0.1)'
+        }}>
+          <Typography 
+            variant="h2" 
+            component="h1" 
+            sx={{ 
+              fontWeight: 'bold',
+              fontSize: { xs: '2.5rem', md: '3.5rem' },
+              background: 'linear-gradient(45deg, #FF0F50 30%, #D10D42 90%)',
+              backgroundClip: 'text',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              mb: 2
+            }}
+          >
+            Premium Video Collection
+          </Typography>
+          <Typography 
+            variant="h6" 
+            sx={{ 
+              color: 'text.secondary',
+              maxWidth: '600px',
+              mx: 'auto',
+              mb: 3
+            }}
+          >
+            Discover exclusive adult content with high-quality videos and secure payment options
+          </Typography>
+          <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', flexWrap: 'wrap', alignItems: 'center' }}>
+            <Chip 
+              label="18+ ADULTS ONLY" 
+              color="error"
+              sx={{ fontWeight: 'bold' }}
+            />
+            <Chip 
+              label="SECURE PAYMENTS" 
+              color="primary"
+              sx={{ fontWeight: 'bold' }}
+            />
+            <Chip 
+              label="INSTANT ACCESS" 
+              color="secondary"
+              sx={{ fontWeight: 'bold' }}
+            />
+            
+            {/* Telegram Button */}
+            {telegramUsername && (
+              <Button
+                variant="contained"
+                startIcon={<TelegramIcon />}
+                onClick={handleTelegramClick}
+                sx={{
+                  backgroundColor: '#0088cc',
+                  color: 'white',
+                  fontWeight: 'bold',
+                  px: 3,
+                  py: 1,
+                  borderRadius: '25px',
+                  textTransform: 'none',
+                  fontSize: '0.9rem',
+                  '&:hover': {
+                    backgroundColor: '#006699',
+                    transform: 'scale(1.05)',
+                  },
+                  transition: 'all 0.3s ease',
+                  boxShadow: '0 4px 12px rgba(0, 136, 204, 0.3)',
+                }}
+              >
+                Contact on Telegram
+              </Button>
+            )}
+          </Box>
+        </Box>
+
         {/* Status das Credenciais */}
         <CredentialsStatus />
         

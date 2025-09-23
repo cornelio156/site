@@ -68,7 +68,7 @@ const VideoCard: FC<VideoCardProps> = ({ video }) => {
 💰 *Price:* $${video.price.toFixed(2)}
 ⏱️ *Duration:* ${video.duration ? formatDuration(video.duration) : 'N/A'}
 👀 *Views:* ${formatViews(video.views)}
-📅 *Added:* ${video.createdAt || video.created_at ? formatDate(new Date(video.createdAt || video.created_at)) : 'N/A'}
+📅 *Added:* ${(video.createdAt || video.created_at) ? formatDate(typeof (video.createdAt || video.created_at) === 'string' ? (video.createdAt || video.created_at!) : (video.createdAt || video.created_at!).toString()) : 'N/A'}
 
 📝 *Description:*
 ${video.description || 'No description available'}
@@ -355,68 +355,6 @@ ${video.description || 'No description available'}
             )}
           </Box>
           
-          {/* Action buttons */}
-          <Box
-            sx={{
-              position: 'absolute',
-              bottom: 12,
-              left: 12,
-              right: 12,
-              display: 'flex',
-              gap: 1,
-              justifyContent: 'center',
-              opacity: isHovered ? 1 : 0,
-              transform: isHovered ? 'translateY(0)' : 'translateY(10px)',
-              transition: 'all 0.3s ease',
-            }}
-          >
-            {/* Preview button */}
-            <Tooltip title="Assistir Preview" arrow>
-              <Button
-                variant="contained"
-                size="small"
-                startIcon={<PreviewIcon />}
-                onClick={handlePreviewClick}
-                sx={{
-                  backgroundColor: 'rgba(33, 150, 243, 0.9)',
-                  color: 'white',
-                  fontWeight: 'bold',
-                  fontSize: '0.75rem',
-                  minWidth: 'auto',
-                  px: 1.5,
-                  py: 0.5,
-                  '&:hover': {
-                    backgroundColor: 'rgba(33, 150, 243, 1)',
-                    transform: 'scale(1.05)',
-                  },
-                }}
-              >
-                Preview
-              </Button>
-            </Tooltip>
-            
-            {/* Telegram button */}
-            {telegramUsername && (
-              <Tooltip title="Contatar no Telegram" arrow>
-                <IconButton
-                  size="small"
-                  onClick={handleTelegramClick}
-                  sx={{
-                    backgroundColor: 'rgba(0, 136, 204, 0.9)',
-                    color: 'white',
-                    width: 36,
-                    height: 36,
-                    '&:hover': {
-                      backgroundColor: 'rgba(0, 136, 204, 1)',
-                      transform: 'scale(1.05)',
-                    },
-                  }}
-                >
-                  <TelegramIcon sx={{ fontSize: 18 }} />
-                </IconButton>
-              </Tooltip>
-            )}
-          </Box>
         </Box>
         
         {/* Duration badge */}
@@ -523,6 +461,62 @@ ${video.description || 'No description available'}
           >
             ${video.price.toFixed(2)}
           </Typography>
+        </Box>
+
+        {/* Action buttons after price */}
+        <Box sx={{ 
+          display: 'flex', 
+          gap: 1, 
+          justifyContent: 'center',
+          mt: 1.5,
+          px: 1
+        }}>
+          {/* Preview button */}
+          <Tooltip title="Watch Preview" arrow>
+            <Button
+              variant="contained"
+              size="small"
+              startIcon={<PreviewIcon />}
+              onClick={handlePreviewClick}
+              sx={{
+                backgroundColor: 'rgba(33, 150, 243, 0.9)',
+                color: 'white',
+                fontWeight: 'bold',
+                fontSize: '0.75rem',
+                minWidth: 'auto',
+                px: 1.5,
+                py: 0.5,
+                '&:hover': {
+                  backgroundColor: 'rgba(33, 150, 243, 1)',
+                  transform: 'scale(1.05)',
+                },
+              }}
+            >
+              Preview
+            </Button>
+          </Tooltip>
+
+          {/* Telegram button */}
+          {telegramUsername && (
+            <Tooltip title="Contact on Telegram" arrow>
+              <IconButton
+                size="small"
+                onClick={handleTelegramClick}
+                sx={{
+                  backgroundColor: 'rgba(0, 136, 204, 0.9)',
+                  color: 'white',
+                  width: 36,
+                  height: 36,
+                  '&:hover': {
+                    backgroundColor: 'rgba(0, 136, 204, 1)',
+                    transform: 'scale(1.05)',
+                  },
+                }}
+              >
+                <TelegramIcon sx={{ fontSize: 18 }} />
+              </IconButton>
+            </Tooltip>
+          )}
         </Box>
       </CardContent>
       </Card>
