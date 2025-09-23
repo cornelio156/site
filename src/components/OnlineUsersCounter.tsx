@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, Typography, Chip, Tooltip, Fade } from '@mui/material';
-import { People, Wifi, WifiOff } from '@mui/icons-material';
+import { People, Wifi, WifiOff, Circle } from '@mui/icons-material';
 import { useOnlineUsers } from '../hooks/useOnlineUsers';
 
 interface OnlineUsersCounterProps {
@@ -76,14 +76,27 @@ const OnlineUsersCounter: React.FC<OnlineUsersCounterProps> = ({
 
   const getStatusIcon = () => {
     if (!isOnline) return <WifiOff />;
-    return <Wifi />;
+    return <Circle sx={{ fontSize: '0.8rem', color: '#4caf50' }} />;
   };
 
   const getTooltipText = () => {
-    if (!isOnline) return 'Conectando...';
-    if (onlineCount === 0) return 'Nenhum usuário online';
-    if (onlineCount === 1) return '1 usuário online';
-    return `${onlineCount} usuários online`;
+    if (!isOnline) return 'Connecting...';
+    if (onlineCount === 0) return 'No users online';
+    if (onlineCount === 1) return '1 user online';
+    return `${onlineCount} users online`;
+  };
+
+  const getStatusText = () => {
+    if (!isOnline) return 'Connecting...';
+    if (onlineCount === 0) return '0 online';
+    return `${onlineCount} online`;
+  };
+
+  const getDetailedStatusText = () => {
+    if (!isOnline) return 'Connecting...';
+    if (onlineCount === 0) return 'No users online';
+    if (onlineCount === 1) return '1 user online';
+    return `${onlineCount} users online`;
   };
 
   if (variant === 'text') {
@@ -100,7 +113,7 @@ const OnlineUsersCounter: React.FC<OnlineUsersCounterProps> = ({
           }}
         >
           {getStatusIcon()}
-          {isOnline ? `${formatCount(onlineCount)} online` : 'Conectando...'}
+          {getStatusText()}
         </Typography>
       </Box>
     );
@@ -128,7 +141,7 @@ const OnlineUsersCounter: React.FC<OnlineUsersCounterProps> = ({
                 {formatCount(onlineCount)}
               </Typography>
               <Typography variant="caption" color="text.secondary">
-                {onlineCount === 1 ? 'usuário online' : 'usuários online'}
+                {onlineCount === 1 ? 'user online' : 'users online'}
               </Typography>
             </Box>
           </Box>
@@ -145,7 +158,7 @@ const OnlineUsersCounter: React.FC<OnlineUsersCounterProps> = ({
           icon={getStatusIcon()}
           label={
             showDetails
-              ? `${formatCount(onlineCount)} online`
+              ? getStatusText()
               : formatCount(onlineCount)
           }
           color={getStatusColor()}

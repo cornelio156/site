@@ -178,8 +178,25 @@ const VideoPlayer: FC = () => {
   }, [video?.product_link]);
 
   const handleTelegramRedirect = () => {
-    if (telegramUsername) {
-      window.open(`https://t.me/${telegramUsername}`, '_blank');
+    if (telegramUsername && video) {
+      // Criar mensagem detalhada com informações do vídeo
+      const videoDetails = `
+🎬 *${video.title}*
+
+💰 *Price:* $${video.price.toFixed(2)}
+⏱️ *Duration:* ${video.duration ? formatDuration(video.duration) : 'N/A'}
+👀 *Views:* ${formatViews(video.views)}
+📅 *Added:* ${video.createdAt ? formatDate(new Date(video.createdAt)) : 'N/A'}
+
+📝 *Description:*
+${video.description || 'No description available'}
+      `.trim();
+
+      // Codificar a mensagem para URL
+      const encodedMessage = encodeURIComponent(videoDetails);
+      
+      // Abrir Telegram com a mensagem pré-formatada
+      window.open(`https://t.me/${telegramUsername}?text=${encodedMessage}`, '_blank');
     }
   };
 

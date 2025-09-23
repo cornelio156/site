@@ -4,14 +4,17 @@ import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import CardMedia from '@mui/material/CardMedia';
 import Typography from '@mui/material/Typography';
-import { Chip, CircularProgress } from '@mui/material';
+import { Chip, CircularProgress, Button, IconButton, Tooltip } from '@mui/material';
 import Box from '@mui/material/Box';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import LockIcon from '@mui/icons-material/Lock';
 import Skeleton from '@mui/material/Skeleton';
+import TelegramIcon from '@mui/icons-material/Telegram';
+import PreviewIcon from '@mui/icons-material/PlayCircleOutline';
 import { VideoService } from '../services/VideoService';
+import { useSiteConfig } from '../context/SiteConfigContext';
 
 interface VideoCardProps {
   video: {
@@ -30,6 +33,7 @@ interface VideoCardProps {
 
 const VideoCard: FC<VideoCardProps> = ({ video }) => {
   const navigate = useNavigate();
+  const { telegramUsername } = useSiteConfig();
   const [isHovered, setIsHovered] = useState(false);
   const [isThumbnailLoading, setIsThumbnailLoading] = useState(true);
   const [thumbnailError, setThumbnailError] = useState(false);
@@ -45,6 +49,36 @@ const VideoCard: FC<VideoCardProps> = ({ video }) => {
       console.error('Error handling video card click:', error);
       // Navigate anyway even if incrementing views fails
       navigate(`/video/${video.$id}`);
+    }
+  };
+
+  const handlePreviewClick = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent card click
+    // Navigate to video page for preview
+    navigate(`/video/${video.$id}`);
+  };
+
+  const handleTelegramClick = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent card click
+    if (telegramUsername) {
+      // Criar mensagem detalhada com informações do vídeo
+      const videoDetails = `
+🎬 *${video.title}*
+
+💰 *Price:* $${video.price.toFixed(2)}
+⏱️ *Duration:* ${video.duration ? formatDuration(video.duration) : 'N/A'}
+👀 *Views:* ${formatViews(video.views)}
+📅 *Added:* ${video.createdAt || video.created_at ? formatDate(new Date(video.createdAt || video.created_at)) : 'N/A'}
+
+📝 *Description:*
+${video.description || 'No description available'}
+      `.trim();
+
+      // Codificar a mensagem para URL
+      const encodedMessage = encodeURIComponent(videoDetails);
+      
+      // Abrir Telegram com a mensagem pré-formatada
+      window.open(`https://t.me/${telegramUsername}?text=${encodedMessage}`, '_blank');
     }
   };
 
@@ -299,6 +333,7 @@ const VideoCard: FC<VideoCardProps> = ({ video }) => {
             transition: 'all 0.3s ease',
           }}
         >
+          {/* Main play button */}
           <Box
             sx={{
               width: '70px',
@@ -317,6 +352,69 @@ const VideoCard: FC<VideoCardProps> = ({ video }) => {
               <PlayArrowIcon sx={{ fontSize: 45, color: 'white' }} />
             ) : (
               <LockIcon sx={{ fontSize: 35, color: 'white' }} />
+            )}
+          </Box>
+          
+          {/* Action buttons */}
+          <Box
+            sx={{
+              position: 'absolute',
+              bottom: 12,
+              left: 12,
+              right: 12,
+              display: 'flex',
+              gap: 1,
+              justifyContent: 'center',
+              opacity: isHovered ? 1 : 0,
+              transform: isHovered ? 'translateY(0)' : 'translateY(10px)',
+              transition: 'all 0.3s ease',
+            }}
+          >
+            {/* Preview button */}
+            <Tooltip title="Assistir Preview" arrow>
+              <Button
+                variant="contained"
+                size="small"
+                startIcon={<PreviewIcon />}
+                onClick={handlePreviewClick}
+                sx={{
+                  backgroundColor: 'rgba(33, 150, 243, 0.9)',
+                  color: 'white',
+                  fontWeight: 'bold',
+                  fontSize: '0.75rem',
+                  minWidth: 'auto',
+                  px: 1.5,
+                  py: 0.5,
+                  '&:hover': {
+                    backgroundColor: 'rgba(33, 150, 243, 1)',
+                    transform: 'scale(1.05)',
+                  },
+                }}
+              >
+                Preview
+              </Button>
+            </Tooltip>
+            
+            {/* Telegram button */}
+            {telegramUsername && (
+              <Tooltip title="Contatar no Telegram" arrow>
+                <IconButton
+                  size="small"
+                  onClick={handleTelegramClick}
+                  sx={{
+                    backgroundColor: 'rgba(0, 136, 204, 0.9)',
+                    color: 'white',
+                    width: 36,
+                    height: 36,
+                    '&:hover': {
+                      backgroundColor: 'rgba(0, 136, 204, 1)',
+                      transform: 'scale(1.05)',
+                    },
+                  }}
+                >
+                  <TelegramIcon sx={{ fontSize: 18 }} />
+                </IconButton>
+              </Tooltip>
             )}
           </Box>
         </Box>

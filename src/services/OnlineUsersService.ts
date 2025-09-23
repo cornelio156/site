@@ -37,7 +37,6 @@ class OnlineUsersService {
       lastSeen: now
     });
     this.notifyListeners();
-    console.log(`Usuário ${userId} adicionado. Total online: ${this.getOnlineCount()}`);
   }
 
   /**
@@ -46,7 +45,6 @@ class OnlineUsersService {
   removeUser(userId: string): void {
     this.users.delete(userId);
     this.notifyListeners();
-    console.log(`Usuário ${userId} removido. Total online: ${this.getOnlineCount()}`);
   }
 
   /**
@@ -93,7 +91,7 @@ class OnlineUsersService {
    */
   private notifyListeners(): void {
     const count = this.getOnlineCount();
-    this.listeners.forEach(callback => {
+    this.listeners.forEach((callback) => {
       try {
         callback(count);
       } catch (error) {
@@ -121,7 +119,6 @@ class OnlineUsersService {
 
     if (inactiveUsers.length > 0) {
       this.notifyListeners();
-      console.log(`Removidos ${inactiveUsers.length} usuários inativos. Total online: ${this.getOnlineCount()}`);
     }
   }
 

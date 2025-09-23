@@ -34,6 +34,10 @@ export const useOnlineUsers = (): UseOnlineUsersReturn => {
       // Adiciona o usuário atual
       onlineService.addUser(userId);
       setIsOnline(true);
+      
+      // Obtém o contador inicial
+      const initialCount = onlineService.getOnlineCount();
+      setOnlineCount(initialCount);
 
       // Adiciona listener para mudanças no contador
       onlineService.addListener(handleCountChange);
