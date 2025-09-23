@@ -8,9 +8,9 @@ import Box from '@mui/material/Box';
 import CircularProgress from '@mui/material/CircularProgress';
 import Alert from '@mui/material/Alert';
 import { Fade, Grow } from '@mui/material';
-import TextField from '@mui/material/TextField';
-import InputAdornment from '@mui/material/InputAdornment';
-import SearchIcon from '@mui/icons-material/Search';
+// import TextField from '@mui/material/TextField'; // Removed - no longer needed
+// import InputAdornment from '@mui/material/InputAdornment'; // Removed - no longer needed
+// import SearchIcon from '@mui/icons-material/Search'; // Removed - no longer needed
 import FormControl from '@mui/material/FormControl';
 import InputLabel from '@mui/material/InputLabel';
 import Select, { SelectChangeEvent } from '@mui/material/Select';
@@ -76,6 +76,7 @@ const VideoList: FC = () => {
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 100]);
   const [durationFilter, setDurationFilter] = useState<string | null>(null);
   const [showAdultWarning, setShowAdultWarning] = useState(false);
+  const [showLoadingModal, setShowLoadingModal] = useState(false);
   
   const { user } = useAuth();
   const { siteConfig } = useSiteConfig();
@@ -86,6 +87,16 @@ const VideoList: FC = () => {
     if (!hasSeenWarning) {
       setShowAdultWarning(true);
     }
+  }, []);
+
+  // Show loading modal for 10 seconds when component mounts
+  useEffect(() => {
+    setShowLoadingModal(true);
+    const timer = setTimeout(() => {
+      setShowLoadingModal(false);
+    }, 10000); // 10 seconds
+
+    return () => clearTimeout(timer);
   }, []);
 
   // Update search query when URL params change
@@ -176,9 +187,9 @@ const VideoList: FC = () => {
     setSortOption(event.target.value as SortOption);
   };
 
-  const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchQuery(event.target.value);
-  };
+  // const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  //   setSearchQuery(event.target.value);
+  // }; // Removed - search is now handled by URL params only
   
   const handlePriceRangeChange = (event: Event, newValue: number | number[]) => {
     setPriceRange(newValue as [number, number]);
@@ -210,6 +221,21 @@ const VideoList: FC = () => {
 
   return (
     <>
+    {/* Add CSS animations for loading modal */}
+    <style>
+      {`
+        @keyframes pulse {
+          0% { opacity: 1; }
+          50% { opacity: 0.7; }
+          100% { opacity: 1; }
+        }
+        @keyframes loadingBar {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(100%); }
+        }
+      `}
+    </style>
+    
     <Container maxWidth="lg" sx={{ py: 4 }}>
       {/* Adult Content Warning Modal */}
       <Modal
@@ -263,6 +289,71 @@ const VideoList: FC = () => {
                 Enter (18+)
               </Button>
             </Box>
+          </Box>
+        </Fade>
+      </Modal>
+
+      {/* Loading Modal */}
+      <Modal
+        open={showLoadingModal}
+        closeAfterTransition
+        BackdropComponent={Backdrop}
+        BackdropProps={{
+          timeout: 500,
+        }}
+        aria-labelledby="loading-modal"
+      >
+        <Fade in={showLoadingModal}>
+          <Box sx={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            width: { xs: '90%', sm: '400px' },
+            bgcolor: 'background.paper',
+            borderRadius: 2,
+            boxShadow: 24,
+            p: 4,
+            textAlign: 'center',
+          }}>
+            <CircularProgress 
+              size={60} 
+              thickness={4}
+              sx={{ 
+                color: 'primary.main',
+                mb: 3,
+                animation: 'pulse 1.5s ease-in-out infinite'
+              }} 
+            />
+            
+            <Typography variant="h5" component="h2" sx={{ fontWeight: 'bold', mb: 2 }}>
+              Loading Videos
+            </Typography>
+            
+            <Typography variant="body1" sx={{ mb: 3, color: 'text.secondary' }}>
+              Please wait while we load the latest videos for you...
+            </Typography>
+            
+            <Box sx={{ 
+              width: '100%', 
+              height: 4, 
+              backgroundColor: 'rgba(0,0,0,0.1)', 
+              borderRadius: 2,
+              overflow: 'hidden',
+              mb: 2
+            }}>
+              <Box sx={{
+                width: '100%',
+                height: '100%',
+                background: 'linear-gradient(90deg, #FF0F50 0%, #D10D42 100%)',
+                borderRadius: 2,
+                animation: 'loadingBar 10s linear infinite'
+              }} />
+            </Box>
+            
+            <Typography variant="caption" color="text.secondary">
+              This will only take a moment...
+            </Typography>
           </Box>
         </Fade>
       </Modal>
@@ -323,53 +414,35 @@ const VideoList: FC = () => {
         
         <Box sx={{ 
           display: 'flex', 
-          flexDirection: { xs: 'column', sm: 'row' }, 
-          gap: 2,
-          width: { xs: '100%', md: 'auto' },
+          gap: 1,
+          alignItems: 'center',
           mt: { xs: 2, md: 0 }
         }}>
-          <TextField
-            placeholder="Search videos..."
-            size="small"
-            value={searchQuery}
-            onChange={handleSearchChange}
-            sx={{ minWidth: { xs: '100%', sm: '200px' } }}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon />
-                </InputAdornment>
-              ),
-            }}
-          />
-          
-          <Box sx={{ display: 'flex', gap: 1 }}>
-            <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: '150px' } }}>
-              <InputLabel id="sort-select-label">Sort By</InputLabel>
-              <Select
-                labelId="sort-select-label"
-                value={sortOption}
-                label="Sort By"
-                onChange={handleSortChange}
-              >
-                <MenuItem value={SortOption.NEWEST}>Newest</MenuItem>
-                <MenuItem value={SortOption.PRICE_ASC}>Price: Low to High</MenuItem>
-                <MenuItem value={SortOption.PRICE_DESC}>Price: High to Low</MenuItem>
-                <MenuItem value={SortOption.VIEWS_DESC}>Most Viewed</MenuItem>
-                <MenuItem value={SortOption.DURATION_DESC}>Longest</MenuItem>
-              </Select>
-            </FormControl>
-            
-            <Button 
-              variant={showFilters ? "contained" : "outlined"}
-              color="primary"
-              startIcon={<FilterListIcon />}
-              onClick={() => setShowFilters(!showFilters)}
-              size="small"
+          <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: '150px' } }}>
+            <InputLabel id="sort-select-label">Sort By</InputLabel>
+            <Select
+              labelId="sort-select-label"
+              value={sortOption}
+              label="Sort By"
+              onChange={handleSortChange}
             >
-              Filters
-            </Button>
-          </Box>
+              <MenuItem value={SortOption.NEWEST}>Newest</MenuItem>
+              <MenuItem value={SortOption.PRICE_ASC}>Price: Low to High</MenuItem>
+              <MenuItem value={SortOption.PRICE_DESC}>Price: High to Low</MenuItem>
+              <MenuItem value={SortOption.VIEWS_DESC}>Most Viewed</MenuItem>
+              <MenuItem value={SortOption.DURATION_DESC}>Longest</MenuItem>
+            </Select>
+          </FormControl>
+          
+          <Button 
+            variant={showFilters ? "contained" : "outlined"}
+            color="primary"
+            startIcon={<FilterListIcon />}
+            onClick={() => setShowFilters(!showFilters)}
+            size="small"
+          >
+            Filters
+          </Button>
         </Box>
       </Box>
       

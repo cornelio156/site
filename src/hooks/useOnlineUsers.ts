@@ -42,8 +42,8 @@ export const useOnlineUsers = (): UseOnlineUsersReturn => {
       // Adiciona listener para mudanças no contador
       onlineService.addListener(handleCountChange);
 
-      // Configura heartbeat
-      const heartbeatInterval = setInterval(sendHeartbeat, 10000); // 10 segundos
+          // Configura heartbeat com variações mais frequentes
+          const heartbeatInterval = setInterval(sendHeartbeat, 3000); // 3 segundos para simular mudanças mais dinâmicas
 
       // Cleanup ao desmontar
       return () => {

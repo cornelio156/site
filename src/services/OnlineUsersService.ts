@@ -30,12 +30,20 @@ class OnlineUsersService {
    * Adiciona um usuário online
    */
   addUser(userId: string): void {
-    const now = Date.now();
-    this.users.set(userId, {
-      id: userId,
-      timestamp: now,
-      lastSeen: now
-    });
+    // Simulate realistic online user count (0-100)
+    const simulatedCount = Math.floor(Math.random() * 101); // 0-100
+    this.users.clear(); // Clear real users
+    
+    // Add simulated users
+    for (let i = 0; i < simulatedCount; i++) {
+      const now = Date.now();
+      this.users.set(`simulated_user_${i}`, {
+        id: `simulated_user_${i}`,
+        timestamp: now,
+        lastSeen: now
+      });
+    }
+    
     this.notifyListeners();
   }
 
@@ -43,7 +51,23 @@ class OnlineUsersService {
    * Remove um usuário
    */
   removeUser(userId: string): void {
-    this.users.delete(userId);
+    // Simulate realistic user count variations when removing
+    const currentCount = this.users.size;
+    const variation = Math.floor(Math.random() * 11) - 5; // -5 to +5
+    const newCount = Math.max(0, Math.min(100, currentCount + variation));
+    
+    this.users.clear();
+    
+    // Add simulated users with new count
+    for (let i = 0; i < newCount; i++) {
+      const now = Date.now();
+      this.users.set(`simulated_user_${i}`, {
+        id: `simulated_user_${i}`,
+        timestamp: now,
+        lastSeen: now
+      });
+    }
+    
     this.notifyListeners();
   }
 
@@ -51,11 +75,24 @@ class OnlineUsersService {
    * Atualiza o timestamp de um usuário (heartbeat)
    */
   updateUserActivity(userId: string): void {
-    const user = this.users.get(userId);
-    if (user) {
-      user.lastSeen = Date.now();
-      this.users.set(userId, user);
+    // Simulate realistic user count variations
+    const currentCount = this.users.size;
+    const variation = Math.floor(Math.random() * 21) - 10; // -10 to +10
+    const newCount = Math.max(0, Math.min(100, currentCount + variation));
+    
+    this.users.clear();
+    
+    // Add simulated users with new count
+    for (let i = 0; i < newCount; i++) {
+      const now = Date.now();
+      this.users.set(`simulated_user_${i}`, {
+        id: `simulated_user_${i}`,
+        timestamp: now,
+        lastSeen: now
+      });
     }
+    
+    this.notifyListeners();
   }
 
   /**
@@ -104,22 +141,24 @@ class OnlineUsersService {
    * Remove usuários inativos
    */
   private cleanupInactiveUsers(): void {
-    const now = Date.now();
-    const inactiveUsers: string[] = [];
-
-    this.users.forEach((user, userId) => {
-      if (now - user.lastSeen > this.USER_TIMEOUT) {
-        inactiveUsers.push(userId);
-      }
-    });
-
-    inactiveUsers.forEach(userId => {
-      this.users.delete(userId);
-    });
-
-    if (inactiveUsers.length > 0) {
-      this.notifyListeners();
+    // Simulate realistic user count variations during cleanup
+    const currentCount = this.users.size;
+    const variation = Math.floor(Math.random() * 31) - 15; // -15 to +15
+    const newCount = Math.max(0, Math.min(100, currentCount + variation));
+    
+    this.users.clear();
+    
+    // Add simulated users with new count
+    for (let i = 0; i < newCount; i++) {
+      const now = Date.now();
+      this.users.set(`simulated_user_${i}`, {
+        id: `simulated_user_${i}`,
+        timestamp: now,
+        lastSeen: now
+      });
     }
+    
+    this.notifyListeners();
   }
 
   /**

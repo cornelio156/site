@@ -17,9 +17,9 @@ import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import Skeleton from '@mui/material/Skeleton';
 import Tooltip from '@mui/material/Tooltip';
-import TextField from '@mui/material/TextField';
-import InputAdornment from '@mui/material/InputAdornment';
-import SearchIcon from '@mui/icons-material/Search';
+// import TextField from '@mui/material/TextField'; // Removed - no longer needed
+// import InputAdornment from '@mui/material/InputAdornment'; // Removed - no longer needed
+// import SearchIcon from '@mui/icons-material/Search'; // Removed - no longer needed
 import Paper from '@mui/material/Paper';
 import { Chip } from '@mui/material';
 import { useAuth } from '../services/Auth';
@@ -132,7 +132,7 @@ const Home: FC = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [setupModalOpen, setSetupModalOpen] = useState(false);
   const [showSetupButton, setShowSetupButton] = useState(false);
-  const [quickSearchQuery, setQuickSearchQuery] = useState('');
+  // const [quickSearchQuery, setQuickSearchQuery] = useState(''); // Removed - no longer needed
   const [loadedVideos, setLoadedVideos] = useState<Video[]>([]);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   
@@ -259,16 +259,16 @@ const Home: FC = () => {
   //   setError(errorMsg);
   // }; // Temporarily disabled with FeaturedBanner
 
-  const handleQuickSearch = (event: React.FormEvent) => {
-    event.preventDefault();
-    if (quickSearchQuery.trim()) {
-      navigate(`/videos?search=${encodeURIComponent(quickSearchQuery.trim())}`);
-    }
-  };
+  // const handleQuickSearch = (event: React.FormEvent) => {
+  //   event.preventDefault();
+  //   if (quickSearchQuery.trim()) {
+  //     navigate(`/videos?search=${encodeURIComponent(quickSearchQuery.trim())}`);
+  //   }
+  // }; // Removed - search is now handled by header search bar only
 
-  const handleQuickSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setQuickSearchQuery(event.target.value);
-  };
+  // const handleQuickSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  //   setQuickSearchQuery(event.target.value);
+  // }; // Removed - search is now handled by header search bar only
 
   const handleTelegramClick = () => {
     if (telegramUsername) {
@@ -339,7 +339,7 @@ I'm here to answer your questions about our videos and services!
           <Typography 
             variant="h2" 
             component="h1" 
-            sx={{ 
+          sx={{ 
               fontWeight: 'bold',
               fontSize: { xs: '2.5rem', md: '3.5rem' },
               background: 'linear-gradient(45deg, #FF0F50 30%, #D10D42 90%)',
@@ -385,12 +385,12 @@ I'm here to answer your questions about our videos and services!
                 variant="contained"
                 startIcon={<TelegramIcon />}
                 onClick={handleTelegramClick}
-                sx={{
+              sx={{ 
                   backgroundColor: '#0088cc',
                   color: 'white',
                   fontWeight: 'bold',
                   px: 3,
-                  py: 1,
+                py: 1,
                   borderRadius: '25px',
                   textTransform: 'none',
                   fontSize: '0.9rem',
@@ -403,7 +403,7 @@ I'm here to answer your questions about our videos and services!
                 }}
               >
                 Contact on Telegram
-              </Button>
+            </Button>
             )}
           </Box>
         </Box>
@@ -411,75 +411,6 @@ I'm here to answer your questions about our videos and services!
         {/* Status das Credenciais */}
         <CredentialsStatus />
         
-        {/* Barra de Pesquisa Rápida */}
-        <Paper 
-          elevation={2}
-          sx={{ 
-            p: 2, 
-            mb: 3, 
-            background: 'linear-gradient(135deg, rgba(255, 15, 80, 0.08) 0%, rgba(209, 13, 66, 0.08) 100%)',
-            borderRadius: 1.5,
-            border: '1px solid rgba(255, 15, 80, 0.1)'
-          }}
-        >
-          <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 600, mb: 1.5, fontSize: '1rem' }}>
-            🔍 Find Your Perfect Video
-          </Typography>
-          <Box 
-            component="form" 
-            onSubmit={handleQuickSearch}
-            sx={{ 
-              display: 'flex', 
-              gap: 1.5, 
-              alignItems: 'center',
-              flexDirection: { xs: 'column', sm: 'row' }
-            }}
-          >
-            <TextField
-              placeholder="Search by title, category, or description..."
-              size="small"
-              value={quickSearchQuery}
-              onChange={handleQuickSearchChange}
-              sx={{ 
-                flexGrow: 1,
-                minWidth: { xs: '100%', sm: '280px' },
-                '& .MuiOutlinedInput-root': {
-                  backgroundColor: 'background.paper',
-                  height: '40px',
-                  '&:hover fieldset': {
-                    borderColor: 'primary.main',
-                  },
-                },
-                '& .MuiInputBase-input': {
-                  fontSize: '0.9rem',
-                },
-              }}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchIcon color="primary" sx={{ fontSize: '20px' }} />
-                  </InputAdornment>
-                ),
-              }}
-            />
-            <Button 
-              type="submit"
-              variant="contained"
-              color="primary"
-              size="small"
-              sx={{ 
-                minWidth: { xs: '100%', sm: '100px' },
-                py: 1,
-                px: 2,
-                fontWeight: 600,
-                height: '40px'
-              }}
-              disabled={!quickSearchQuery.trim()}
-            >
-              Search
-            </Button>
-          </Box>
-        </Paper>
 
         <Box sx={{ 
           display: 'flex', 
