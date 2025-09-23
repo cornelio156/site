@@ -21,7 +21,15 @@ class TelegramService {
    */
   static async sendSaleNotification(notification: TelegramNotification): Promise<boolean> {
     try {
+      console.log('TelegramService: Preparing to send notification:', {
+        videoTitle: notification.videoTitle,
+        videoPrice: notification.videoPrice,
+        paymentMethod: notification.paymentMethod,
+        transactionId: notification.transactionId
+      });
+      
       const message = this.formatSaleMessage(notification);
+      console.log('TelegramService: Formatted message:', message);
       
       const response = await fetch(`${this.API_URL}${this.BOT_TOKEN}/sendMessage`, {
         method: 'POST',

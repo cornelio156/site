@@ -672,7 +672,11 @@ const VideoPlayer: FC = () => {
     const paymentSuccess = queryParams.get('payment_success');
     const sessionId = queryParams.get('session_id');
     
+    console.log('Stripe payment check:', { paymentSuccess, sessionId, video: !!video, videoTitle: video?.title });
+    
     if (paymentSuccess === 'true' && video) {
+      console.log('Stripe payment successful, processing notification...');
+      
       // Update state to show purchase was successful
       setHasPurchased(true);
       setPurchaseComplete(true);
@@ -688,6 +692,7 @@ const VideoPlayer: FC = () => {
       
       // Send Telegram notification for Stripe payment (same as PayPal)
       if (sessionId) {
+        console.log('Sending Stripe notification to Telegram with sessionId:', sessionId);
         TelegramService.sendSaleNotification({
           videoTitle: video.title,
           videoPrice: video.price,
@@ -696,9 +701,13 @@ const VideoPlayer: FC = () => {
           transactionId: sessionId,
           paymentMethod: 'stripe',
           timestamp: new Date().toLocaleString('pt-BR')
+        }).then(success => {
+          console.log('Stripe notification result:', success);
         }).catch(error => {
           console.error('Failed to send Stripe notification to Telegram:', error);
         });
+      } else {
+        console.warn('No sessionId found for Stripe payment notification');
       }
       
       // Clear query params

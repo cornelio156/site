@@ -30,6 +30,7 @@ import FeaturedBanner from '../components/FeaturedBanner';
 import DatabaseSetupModal from '../components/DatabaseSetupModal';
 import CredentialsStatus from '../components/CredentialsStatus';
 import ContactSection from '../components/ContactSection';
+import OnlineUsersCounter from '../components/OnlineUsersCounter';
 
 // Skeleton card component for loading state
 const VideoCardSkeleton: FC = () => {
@@ -284,6 +285,13 @@ const Home: FC = () => {
       {/* Banner de destaque */}
       <FeaturedBanner onError={handleBannerError} />
       
+      {/* Contador de usuários online */}
+      <OnlineUsersCounter 
+        variant="detailed" 
+        position="fixed" 
+        size="medium" 
+      />
+      
       <Container maxWidth="lg" sx={{ py: 4 }}>
         {/* Status das Credenciais */}
         <CredentialsStatus />
@@ -400,6 +408,13 @@ const Home: FC = () => {
                     fontWeight: 'bold',
                     border: '1px solid rgba(255, 15, 80, 0.3)'
                   }}
+                />
+                
+                {/* Contador de usuários online */}
+                <OnlineUsersCounter 
+                  variant="chip" 
+                  size="small" 
+                  showDetails={true}
                 />
                 
                 {/* Loading progress indicator */}

@@ -48,11 +48,13 @@ import InputAdornment from '@mui/material/InputAdornment';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import { styled } from '@mui/material/styles';
 import Card from '@mui/material/Card';
+import OnlineUsersPanel from '../components/OnlineUsersPanel';
 import CardContent from '@mui/material/CardContent';
 import CardMedia from '@mui/material/CardMedia';
 import Collapse from '@mui/material/Collapse';
 import Divider from '@mui/material/Divider';
 import VideoLibraryIcon from '@mui/icons-material/VideoLibrary';
+import PeopleIcon from '@mui/icons-material/People';
 import SettingsIcon from '@mui/icons-material/Settings';
 import GroupIcon from '@mui/icons-material/Group';
 import Snackbar from '@mui/material/Snackbar';
@@ -638,6 +640,7 @@ const Admin: FC = () => {
           <Tabs value={tabValue} onChange={handleTabChange} aria-label="admin tabs">
             <Tab icon={<VideoLibraryIcon />} label="Manage Videos" />
             <Tab icon={<SettingsIcon />} label="Site Configuration & Users" />
+            <Tab icon={<PeopleIcon />} label="Online Users" />
           </Tabs>
         </Box>
         
@@ -1270,6 +1273,44 @@ const Admin: FC = () => {
               </Grid>
             </Paper>
           )}
+        </TabPanel>
+        
+        {/* Online Users Tab */}
+        <TabPanel value={tabValue} index={2}>
+          <Box sx={{ mb: 4 }}>
+            <Grid container spacing={3}>
+              <Grid item xs={12} md={6}>
+                <OnlineUsersPanel 
+                  showDetails={true} 
+                  refreshInterval={5000}
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <Card>
+                  <CardContent>
+                    <Typography variant="h6" gutterBottom>
+                      Estatísticas em Tempo Real
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" paragraph>
+                      Monitore quantos usuários estão acessando seu site em tempo real.
+                      Os dados são atualizados automaticamente a cada 5 segundos.
+                    </Typography>
+                    <Box sx={{ mt: 2 }}>
+                      <Typography variant="subtitle2" gutterBottom>
+                        Funcionalidades:
+                      </Typography>
+                      <ul>
+                        <li>Contador de usuários online em tempo real</li>
+                        <li>Lista de usuários ativos com timestamps</li>
+                        <li>Status de conexão de cada usuário</li>
+                        <li>Atualização automática dos dados</li>
+                      </ul>
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+            </Grid>
+          </Box>
         </TabPanel>
       </Paper>
       
