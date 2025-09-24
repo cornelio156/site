@@ -106,7 +106,7 @@ const VideoPlayer: FC = () => {
         setPurchaseError(null);
         setPreviewUrl(null);
 
-        // Get video details
+        // Get video details FIRST (ultra-fast operation)
         const videoData = await VideoService.getVideo(id);
         if (!videoData) {
           setError('Video not found');
@@ -114,21 +114,27 @@ const VideoPlayer: FC = () => {
           return;
         }
         
+        // Set video immediately - this shows the video info right away
         setVideo(videoData);
         
-        // Increment view count
-        await VideoService.incrementViews(id);
-
-        // Get preview video URL (this is the preview that everyone can watch)
-        try {
-          // Pass the current user ID as the second parameter or a dummy ID if not logged in
-          const url = await VideoService.getVideoFileUrl(id);
-          console.log('Video URL obtained:', url);
-          setPreviewUrl(url);
-        } catch (err) {
-          console.error('Error loading preview video:', err);
-          // Don't set error, just log it - the thumbnail will be shown instead
-        }
+        // Set loading to false immediately so user sees the video info
+        setLoading(false);
+        
+        // Load preview video URL in background (non-blocking)
+        VideoService.getVideoFileUrl(id)
+          .then(url => {
+            console.log('Video URL obtained:', url);
+            setPreviewUrl(url);
+          })
+          .catch(err => {
+            console.error('Error loading preview video:', err);
+            // Don't set error, just log it - the thumbnail will be shown instead
+          });
+        
+        // Increment view count in background (non-blocking)
+        VideoService.incrementViews(id).catch(err => {
+          console.error('Error incrementing views:', err);
+        });
         
         // Check if user has purchased this video (only if logged in)
         if (user) {
@@ -162,7 +168,6 @@ const VideoPlayer: FC = () => {
       } catch (err) {
         console.error('Error loading video:', err);
         setError('Failed to load video. Please try again later.');
-      } finally {
         setLoading(false);
       }
     };

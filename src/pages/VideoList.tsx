@@ -209,8 +209,59 @@ const VideoList: FC = () => {
   const loadVideosOneByOne = async (videoIds: string[]) => {
     setIsLoadingMore(true);
     
-    for (let i = 0; i < videoIds.length; i++) {
-      const videoId = videoIds[i];
+    // Load first 3 videos immediately without delay
+    const immediateVideos = videoIds.slice(0, 3);
+    const remainingVideos = videoIds.slice(3);
+    
+    // Load first 3 videos in parallel for instant display
+    const immediatePromises = immediateVideos.map(async (videoId) => {
+      try {
+        const video = await VideoService.getVideo(videoId);
+        if (video) {
+          // Apply client-side filtering for price range
+          const priceMatch = video.price >= priceRange[0] && video.price <= priceRange[1];
+          
+          // Apply duration filter if selected
+          let durationMatch = true;
+          if (durationFilter) {
+            const duration = video.duration || '00:00';
+            const parts = duration.split(':').map(Number);
+            const seconds = parts.length === 2 
+              ? parts[0] * 60 + parts[1] 
+              : parts[0] * 3600 + parts[1] * 60 + parts[2];
+              
+            switch(durationFilter) {
+              case 'short': // Less than 5 minutes
+                durationMatch = seconds < 300;
+                break;
+              case 'medium': // 5-15 minutes
+                durationMatch = seconds >= 300 && seconds <= 900;
+                break;
+              case 'long': // More than 15 minutes
+                durationMatch = seconds > 900;
+                break;
+              default:
+                durationMatch = true;
+            }
+          }
+          
+          // Only add video if it passes all filters
+          if (priceMatch && durationMatch) {
+            setLoadedVideos(prev => [...prev, video]);
+            setVideos(prev => [...prev, video]);
+          }
+        }
+      } catch (error) {
+        console.error(`Error loading video ${videoId}:`, error);
+      }
+    });
+    
+    // Wait for first 3 videos to load
+    await Promise.all(immediatePromises);
+    
+    // Load remaining videos one by one with delay
+    for (let i = 0; i < remainingVideos.length; i++) {
+      const videoId = remainingVideos[i];
       
       try {
         // Load individual video
@@ -252,10 +303,8 @@ const VideoList: FC = () => {
           }
         }
         
-        // Add a small delay between videos (except for the first one)
-        if (i > 0) {
-          await new Promise(resolve => setTimeout(resolve, 150));
-        }
+        // Add a small delay between videos
+        await new Promise(resolve => setTimeout(resolve, 150));
       } catch (error) {
         console.error(`Error loading video ${videoId}:`, error);
         // Continue with next video even if current one fails

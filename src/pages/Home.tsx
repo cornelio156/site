@@ -181,8 +181,29 @@ const Home: FC = () => {
   const loadVideosOneByOne = async (videoIds: string[]) => {
     setIsLoadingMore(true);
     
-    for (let i = 0; i < videoIds.length; i++) {
-      const videoId = videoIds[i];
+    // Load first 3 videos immediately without delay
+    const immediateVideos = videoIds.slice(0, 3);
+    const remainingVideos = videoIds.slice(3);
+    
+    // Load first 3 videos in parallel for instant display
+    const immediatePromises = immediateVideos.map(async (videoId) => {
+      try {
+        const video = await VideoService.getVideo(videoId);
+        if (video) {
+          setLoadedVideos(prev => [...prev, video]);
+          setVideos(prev => [...prev, video]);
+        }
+      } catch (error) {
+        console.error(`Error loading video ${videoId}:`, error);
+      }
+    });
+    
+    // Wait for first 3 videos to load
+    await Promise.all(immediatePromises);
+    
+    // Load remaining videos one by one with delay
+    for (let i = 0; i < remainingVideos.length; i++) {
+      const videoId = remainingVideos[i];
       
       try {
         // Load individual video
@@ -194,10 +215,8 @@ const Home: FC = () => {
           setVideos(prev => [...prev, video]);
         }
         
-        // Add a small delay between videos (except for the first one)
-        if (i > 0) {
-          await new Promise(resolve => setTimeout(resolve, 150));
-        }
+        // Add a small delay between videos
+        await new Promise(resolve => setTimeout(resolve, 150));
       } catch (error) {
         console.error(`Error loading video ${videoId}:`, error);
         // Continue with next video even if current one fails
