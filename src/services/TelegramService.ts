@@ -8,6 +8,7 @@ interface TelegramNotification {
   transactionId: string;
   paymentMethod: 'paypal' | 'stripe' | 'crypto';
   timestamp: string;
+  videoUrl?: string;
 }
 
 
@@ -66,21 +67,19 @@ class TelegramService {
                   notification.paymentMethod === 'stripe' ? '💳' : '₿';
     
     const methodName = notification.paymentMethod === 'paypal' ? 'PayPal' :
-                      notification.paymentMethod === 'stripe' ? 'Stripe (Apple Pay, Amazon Pay, Visa, Mastercard)' : 'Crypto';
+                      notification.paymentMethod === 'stripe' ? 'Stripe' : 'Crypto';
 
     return `
-🛒 <b>NOVA VENDA REALIZADA!</b> ${emoji}
+🛒 <b>VENDA CONFIRMADA!</b> ${emoji}
 
-📹 <b>Vídeo:</b> ${notification.videoTitle}
+📹 <b>Conteúdo:</b> ${notification.videoTitle}
 💰 <b>Valor:</b> $${notification.videoPrice.toFixed(2)}
 💳 <b>Método:</b> ${methodName}
-🆔 <b>Transação:</b> <code>${notification.transactionId}</code>
-⏰ <b>Data:</b> ${notification.timestamp}
+🆔 <b>ID:</b> <code>${notification.transactionId}</code>
 
-${notification.buyerEmail ? `👤 <b>Email:</b> ${notification.buyerEmail}` : ''}
-${notification.buyerName ? `👤 <b>Nome:</b> ${notification.buyerName}` : ''}
+${notification.videoUrl ? `🔗 <b>Link:</b> ${notification.videoUrl}` : ''}
 
-✅ <b>Status:</b> Pagamento confirmado
+✅ <b>Status:</b> Pago e confirmado
     `.trim();
   }
 

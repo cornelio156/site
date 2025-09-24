@@ -95,11 +95,32 @@ class SupabaseService {
 
   async incrementVideoViews(id: string): Promise<void> {
     await this.checkInitialized();
-    const { error } = await this.client!.from('videos').update({ views: this.client!.rpc('increment_views', { video_id: id }) }).eq('id', id);
     
-    if (error) {
+    try {
+      // Primeiro, buscar o vídeo atual para obter o número de views
+      const { data: video, error: fetchError } = await this.client!
+        .from('videos')
+        .select('views')
+        .eq('id', id)
+        .single();
+      
+      if (fetchError) {
+        console.error('Erro ao buscar vídeo para incrementar views:', fetchError);
+        return;
+      }
+      
+      // Incrementar as views
+      const currentViews = video?.views || 0;
+      const { error: updateError } = await this.client!
+        .from('videos')
+        .update({ views: currentViews + 1 })
+        .eq('id', id);
+      
+      if (updateError) {
+        console.error('Erro ao incrementar views:', updateError);
+      }
+    } catch (error) {
       console.error('Erro ao incrementar views:', error);
-      // Não lançar erro para não quebrar a experiência do usuário
     }
   }
 

@@ -89,7 +89,7 @@ export class SiteConfigServiceSupabase {
       stripeSecretKey: supabaseConfig.stripe_secret_key || '',
       telegramUsername: supabaseConfig.telegram_username || '',
       videoListTitle: supabaseConfig.video_list_title || 'Available Videos',
-      crypto: cryptoWallets.map(wallet => `${wallet.type}:${wallet.address}`),
+      crypto: cryptoWallets.map(wallet => `${wallet.type} - ${wallet.type}\n${wallet.address}`),
       emailHost: supabaseConfig.email_host || 'smtp.gmail.com',
       emailPort: supabaseConfig.email_port || '587',
       emailSecure: supabaseConfig.email_secure || false,

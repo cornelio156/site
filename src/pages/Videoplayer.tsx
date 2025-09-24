@@ -581,7 +581,8 @@ ${video.description || 'No description available'}
             buyerName: orderData?.payer?.name?.given_name,
             transactionId: orderData.id,
             paymentMethod: 'paypal',
-            timestamp: new Date().toLocaleString('pt-BR')
+            timestamp: new Date().toLocaleString('pt-BR'),
+            videoUrl: `${window.location.origin}/video/${video.$id}`
           });
         } catch (telegramError) {
           console.error('Failed to send Telegram notification:', telegramError);
@@ -722,7 +723,8 @@ ${video.description || 'No description available'}
           buyerName: undefined, // Stripe doesn't provide name in success URL
           transactionId: sessionId,
           paymentMethod: 'stripe',
-          timestamp: new Date().toLocaleString('pt-BR')
+          timestamp: new Date().toLocaleString('pt-BR'),
+          videoUrl: `${window.location.origin}/video/${video.$id}`
         }).then(success => {
           console.log('Stripe notification result:', success);
         }).catch(error => {
@@ -1450,7 +1452,7 @@ ${video.description || 'No description available'}
             top: '50%',
             left: '50%',
             transform: 'translate(-50%, -50%)',
-            width: { xs: '95%', sm: 420 },
+            width: { xs: '95%', sm: 420, md: 500 },
             bgcolor: theme.palette.mode === 'dark' ? '#181818' : '#fff',
             borderRadius: 3,
             boxShadow: 24,
@@ -1478,8 +1480,9 @@ ${video.description || 'No description available'}
               return (
                 <Box key={idx} sx={{
                   display: 'flex',
-                  alignItems: 'center',
-                  gap: 2,
+                  flexDirection: { xs: 'column', sm: 'row' },
+                  alignItems: { xs: 'stretch', sm: 'center' },
+                  gap: { xs: 2, sm: 2 },
                   mb: 3,
                   p: 2,
                   border: '1px solid',
@@ -1487,10 +1490,27 @@ ${video.description || 'No description available'}
                   borderRadius: 2,
                   background: theme.palette.mode === 'dark' ? '#232323' : '#fafafa',
                 }}>
-                  <Box sx={{ minWidth: 40 }}>{cryptoIcons[code] || <MonetizationOnIcon fontSize="large" />}</Box>
-                  <Box sx={{ flex: 1 }}>
-                    <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>{name || code}</Typography>
-                    <Typography variant="body2" sx={{ wordBreak: 'break-all', color: theme.palette.mode === 'dark' ? '#fff' : '#222' }}>{address}</Typography>
+                  <Box sx={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: 2, 
+                    flex: 1,
+                    minWidth: 0
+                  }}>
+                    <Box sx={{ minWidth: 40, flexShrink: 0 }}>{cryptoIcons[code] || <MonetizationOnIcon fontSize="large" />}</Box>
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>{name || code}</Typography>
+                      <Typography 
+                        variant="body2" 
+                        sx={{ 
+                          wordBreak: 'break-all', 
+                          color: theme.palette.mode === 'dark' ? '#fff' : '#222',
+                          fontSize: { xs: '0.75rem', sm: '0.875rem' }
+                        }}
+                      >
+                        {address}
+                      </Typography>
+                    </Box>
                   </Box>
                   <Button
                     variant={copiedWalletIndex === idx ? 'contained' : 'outlined'}
@@ -1502,7 +1522,10 @@ ${video.description || 'No description available'}
                       setCopiedWalletIndex(idx);
                       setTimeout(() => setCopiedWalletIndex(null), 2000);
                     }}
-                    sx={{ minWidth: 90 }}
+                    sx={{ 
+                      minWidth: { xs: '100%', sm: 90 },
+                      mt: { xs: 1, sm: 0 }
+                    }}
                   >
                     {copiedWalletIndex === idx ? 'Copied!' : 'Copy'}
                   </Button>
