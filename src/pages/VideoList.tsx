@@ -158,7 +158,7 @@ const VideoList: FC = () => {
     setShowLoadingModal(true);
     const timer = setTimeout(() => {
       setShowLoadingModal(false);
-    }, 10000); // 10 seconds
+    }, 5000); // 10 seconds
 
     return () => clearTimeout(timer);
   }, []);
@@ -186,7 +186,7 @@ const VideoList: FC = () => {
         let filteredIds = allVideoIds;
         if (debouncedSearchQuery) {
           // For search, we need to get full videos to filter by title/description
-          const allVideos = await VideoService.getAllVideos(sortOption, debouncedSearchQuery);
+        const allVideos = await VideoService.getAllVideos(sortOption, debouncedSearchQuery);
           filteredIds = allVideos.map(v => v.$id);
         }
         
@@ -218,7 +218,7 @@ const VideoList: FC = () => {
       try {
         const video = await VideoService.getVideo(videoId);
         if (video) {
-          // Apply client-side filtering for price range
+        // Apply client-side filtering for price range
           const priceMatch = video.price >= priceRange[0] && video.price <= priceRange[1];
           
           // Apply duration filter if selected
@@ -247,8 +247,20 @@ const VideoList: FC = () => {
           
           // Only add video if it passes all filters
           if (priceMatch && durationMatch) {
-            setLoadedVideos(prev => [...prev, video]);
-            setVideos(prev => [...prev, video]);
+            setLoadedVideos(prev => {
+              // Check if video already exists to prevent duplicates
+              if (prev.some(v => v.$id === video.$id)) {
+                return prev;
+              }
+              return [...prev, video];
+            });
+            setVideos(prev => {
+              // Check if video already exists to prevent duplicates
+              if (prev.some(v => v.$id === video.$id)) {
+                return prev;
+              }
+              return [...prev, video];
+            });
           }
         }
       } catch (error) {
@@ -270,10 +282,10 @@ const VideoList: FC = () => {
         if (video) {
           // Apply client-side filtering for price range
           const priceMatch = video.price >= priceRange[0] && video.price <= priceRange[1];
-          
-          // Apply duration filter if selected
+        
+        // Apply duration filter if selected
           let durationMatch = true;
-          if (durationFilter) {
+        if (durationFilter) {
             const duration = video.duration || '00:00';
             const parts = duration.split(':').map(Number);
             const seconds = parts.length === 2 
@@ -297,9 +309,21 @@ const VideoList: FC = () => {
           
           // Only add video if it passes all filters
           if (priceMatch && durationMatch) {
-            // Add video immediately to both arrays
-            setLoadedVideos(prev => [...prev, video]);
-            setVideos(prev => [...prev, video]);
+            // Add video immediately to both arrays, checking for duplicates
+            setLoadedVideos(prev => {
+              // Check if video already exists to prevent duplicates
+              if (prev.some(v => v.$id === video.$id)) {
+                return prev;
+              }
+              return [...prev, video];
+            });
+            setVideos(prev => {
+              // Check if video already exists to prevent duplicates
+              if (prev.some(v => v.$id === video.$id)) {
+                return prev;
+              }
+              return [...prev, video];
+            });
           }
         }
         
@@ -593,31 +617,31 @@ const VideoList: FC = () => {
           alignItems: 'center',
           mt: { xs: 2, md: 0 }
         }}>
-          <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: '150px' } }}>
-            <InputLabel id="sort-select-label">Sort By</InputLabel>
-            <Select
-              labelId="sort-select-label"
-              value={sortOption}
-              label="Sort By"
-              onChange={handleSortChange}
+            <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: '150px' } }}>
+              <InputLabel id="sort-select-label">Sort By</InputLabel>
+              <Select
+                labelId="sort-select-label"
+                value={sortOption}
+                label="Sort By"
+                onChange={handleSortChange}
+              >
+                <MenuItem value={SortOption.NEWEST}>Newest</MenuItem>
+                <MenuItem value={SortOption.PRICE_ASC}>Price: Low to High</MenuItem>
+                <MenuItem value={SortOption.PRICE_DESC}>Price: High to Low</MenuItem>
+                <MenuItem value={SortOption.VIEWS_DESC}>Most Viewed</MenuItem>
+                <MenuItem value={SortOption.DURATION_DESC}>Longest</MenuItem>
+              </Select>
+            </FormControl>
+            
+            <Button 
+              variant={showFilters ? "contained" : "outlined"}
+              color="primary"
+              startIcon={<FilterListIcon />}
+              onClick={() => setShowFilters(!showFilters)}
+              size="small"
             >
-              <MenuItem value={SortOption.NEWEST}>Newest</MenuItem>
-              <MenuItem value={SortOption.PRICE_ASC}>Price: Low to High</MenuItem>
-              <MenuItem value={SortOption.PRICE_DESC}>Price: High to Low</MenuItem>
-              <MenuItem value={SortOption.VIEWS_DESC}>Most Viewed</MenuItem>
-              <MenuItem value={SortOption.DURATION_DESC}>Longest</MenuItem>
-            </Select>
-          </FormControl>
-          
-          <Button 
-            variant={showFilters ? "contained" : "outlined"}
-            color="primary"
-            startIcon={<FilterListIcon />}
-            onClick={() => setShowFilters(!showFilters)}
-            size="small"
-          >
-            Filters
-          </Button>
+              Filters
+            </Button>
         </Box>
       </Box>
       

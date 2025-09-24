@@ -147,30 +147,22 @@ ${video.description || 'No description available'}
     if (video.thumbnailUrl) {
       setIsThumbnailLoading(true);
       setThumbnailError(false);
-      
-      // Set timeout for thumbnail loading (10 seconds)
-      const timeoutId = setTimeout(() => {
-        if (isThumbnailLoading) {
-          console.warn(`Thumbnail loading timeout for video: ${video.title}`);
-          setThumbnailError(true);
-          setIsThumbnailLoading(false);
-        }
-      }, 10000);
-      
-      return () => clearTimeout(timeoutId);
     } else {
       setIsThumbnailLoading(false);
       setThumbnailError(true);
     }
-  }, [video.thumbnailUrl, isThumbnailLoading]);
+  }, [video.thumbnailUrl]);
 
   const handleThumbnailLoad = () => {
+    console.log(`Thumbnail loaded successfully for video: ${video.title}`);
     setIsThumbnailLoading(false);
+    setThumbnailError(false);
   };
 
-  const handleThumbnailError = () => {
-    setIsThumbnailLoading(false);
+  const onThumbnailError = () => {
+    console.warn(`Thumbnail failed to load for video: ${video.title}`);
     setThumbnailError(true);
+    setIsThumbnailLoading(false);
   };
 
   return (
@@ -226,7 +218,7 @@ ${video.description || 'No description available'}
               filter: 'brightness(0.9)',
             }}
             onLoad={handleThumbnailLoad}
-            onError={handleThumbnailError}
+            onError={onThumbnailError}
           />
         ) : (
           <Skeleton 

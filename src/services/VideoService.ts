@@ -1,5 +1,8 @@
-import { jsonDatabaseService, VideoData } from './JSONDatabaseService';
+import { jsonDatabaseService } from './JSONDatabaseService';
+import type { VideoData } from './WasabiMetadataService';
 import { wasabiService } from './WasabiService';
+import { VideoServiceSupabase } from './VideoServiceSupabase';
+import { MIGRATION_CONFIG } from './MigrationService';
 
 // Video interface - mantém compatibilidade com o frontend
 export interface Video {
@@ -102,85 +105,29 @@ export class VideoService {
     try {
       console.log('Getting video IDs only (fast operation)');
       
-      // Get video data from database (without thumbnails)
-      const videoDataList = await jsonDatabaseService.getAllVideos();
+      // Use Supabase only - no fallback
+      if (MIGRATION_CONFIG.useSupabaseForVideos) {
+        return await VideoServiceSupabase.getVideoIds(sortOption);
+      }
       
-      // Convert to basic format and sort
-      const videos = videoDataList.map(videoData => ({
-        $id: videoData.id,
-        title: videoData.title,
-        price: videoData.price,
-        createdAt: videoData.createdAt,
-        views: videoData.views,
-        duration: videoData.duration
-      }));
-      
-      // Sort videos
-      const sortedVideos = this.sortVideos(videos as Video[], sortOption);
-      
-      // Return only IDs
-      return sortedVideos.map(video => video.$id);
+      throw new Error('Supabase is required for video operations');
     } catch (error) {
-      console.error('Error getting video IDs:', error);
-      return [];
+      console.error('Error getting video IDs from Supabase:', error);
+      throw error;
     }
   }
 
   // Get all videos with sorting options
   static async getAllVideos(sortOption: SortOption = SortOption.NEWEST, searchQuery: string = ''): Promise<Video[]> {
     try {
-      // Se não há busca e o cache é válido, usar cache
-      if (!searchQuery && this.isCacheValid()) {
-        console.log('Usando cache de vídeos');
-        return this.sortVideos([...this.videosCache!], sortOption);
-      }
-
-      console.log('Buscando todos os vídeos do SQLite database');
-      
-      // Buscar vídeos do SQLite database
-      const videoDataList = await jsonDatabaseService.getAllVideos();
-      
-      // Converter para formato do frontend
-      let videos = videoDataList.map(videoData => this.convertVideoData(videoData));
-      
-      // Aplicar pesquisa do lado do cliente se a consulta for fornecida
-      if (searchQuery && searchQuery.trim() !== '') {
-        const trimmedQuery = searchQuery.trim().toLowerCase();
-        videos = videos.filter(video => 
-          video.title.toLowerCase().includes(trimmedQuery) || 
-          video.description.toLowerCase().includes(trimmedQuery)
-        );
-      }
-
-      // Obter URLs de miniaturas para cada vídeo
-      for (const video of videos) {
-        const thumbnailId = video.thumbnailFileId || video.thumbnail_id;
-        
-        if (thumbnailId) {
-          try {
-            video.thumbnailUrl = await wasabiService.getThumbnailUrl(thumbnailId);
-          } catch (error) {
-            console.error(`Erro ao obter miniatura para o vídeo ${video.$id}:`, error);
-            // Usar placeholder se a miniatura não estiver disponível
-            video.thumbnailUrl = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjE4MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMzAwIiBoZWlnaHQ9IjE4MCIgZmlsbD0iI2Y1ZjVmNSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM5OTk5OTkiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5WaWRlbyBUaHVtYm5haWw8L3RleHQ+PC9zdmc+';
-          }
-        } else {
-          // Usar placeholder se não houver ID de miniatura
-          video.thumbnailUrl = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjE4MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMzAwIiBoZWlnaHQ9IjE4MCIgZmlsbD0iI2Y1ZjVmNSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM5OTk5OTkiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5WaWRlbyBUaHVtYm5haWw8L3RleHQ+PC9zdmc+';
-        }
-      }
-
-      // Atualizar cache se não há busca
-      if (!searchQuery) {
-        this.videosCache = [...videos];
-        this.cacheTimestamp = Date.now();
-        console.log('Cache atualizado com', videos.length, 'vídeos');
+      // Use Supabase only - no fallback
+      if (MIGRATION_CONFIG.useSupabaseForVideos) {
+        return await VideoServiceSupabase.getAllVideos(sortOption, searchQuery);
       }
       
-      // Ordenar vídeos
-      return this.sortVideos(videos, sortOption);
+      throw new Error('Supabase is required for video operations');
     } catch (error) {
-      console.error('Erro ao obter vídeos:', error);
+      console.error('Error getting videos from Supabase:', error);
       throw error;
     }
   }
@@ -222,42 +169,15 @@ export class VideoService {
   static async getVideo(videoId: string): Promise<Video | null> {
     try {
       console.log(`Getting single video ${videoId} (optimized)`);
-      const videoData = await jsonDatabaseService.getVideo(videoId);
       
-      if (!videoData) {
-        console.log(`Video ${videoId} not found in database`);
-        return null;
+      // Use Supabase only - no fallback
+      if (MIGRATION_CONFIG.useSupabaseForVideos) {
+        return await VideoServiceSupabase.getVideo(videoId);
       }
       
-      const video = this.convertVideoData(videoData);
-      
-      // Get thumbnail URL asynchronously (non-blocking)
-      const thumbnailId = video.thumbnailFileId || video.thumbnail_id;
-      
-      if (thumbnailId) {
-        // Load thumbnail in background, don't wait for it
-        wasabiService.getThumbnailUrl(thumbnailId)
-          .then(url => {
-            video.thumbnailUrl = url;
-            // Trigger a re-render if needed (optional)
-            console.log(`Thumbnail loaded for video ${video.$id}`);
-          })
-          .catch(error => {
-          console.error(`Error getting thumbnail for video ${video.$id}:`, error);
-            video.thumbnailUrl = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjE4MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMzAwIiBoZWlnaHQ9IjE4MCIgZmlsbD0iI2Y1ZjVmNSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM5OTk5OTkiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5WaWRlbyBUaHVtYm5haWw8L3RleHQ+PC9zdmc+';
-          });
-        
-        // Set a placeholder immediately
-          video.thumbnailUrl = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjE4MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMzAwIiBoZWlnaHQ9IjE4MCIgZmlsbD0iI2Y1ZjVmNSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM5OTk5OTkiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5WaWRlbyBUaHVtYm5haWw8L3RleHQ+PC9zdmc+';
-      } else {
-        // Use placeholder if no thumbnail ID
-        video.thumbnailUrl = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjE4MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMzAwIiBoZWlnaHQ9IjE4MCIgZmlsbD0iI2Y1ZjVmNSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM5OTk5OTkiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5WaWRlbyBUaHVtYm5haWw8L3RleHQ+PC9zdmc+';
-      }
-      
-      console.log(`Video ${videoId} loaded successfully`);
-      return video;
+      throw new Error('Supabase is required for video operations');
     } catch (error) {
-      console.error(`Error getting video ${videoId}:`, error);
+      console.error(`Error getting video ${videoId} from Supabase:`, error);
       return null;
     }
   }
@@ -265,9 +185,15 @@ export class VideoService {
   // Increment view count for a video
   static async incrementViews(videoId: string): Promise<void> {
     try {
-      await jsonDatabaseService.incrementVideoViews(videoId);
+      // Use Supabase only - no fallback
+      if (MIGRATION_CONFIG.useSupabaseForVideos) {
+        await VideoServiceSupabase.incrementViews(videoId);
+        return;
+      }
+      
+      throw new Error('Supabase is required for video operations');
     } catch (error) {
-      console.error(`Error incrementing views for video ${videoId}:`, error);
+      console.error(`Error incrementing views for video ${videoId} from Supabase:`, error);
     }
   }
   
@@ -305,35 +231,14 @@ export class VideoService {
     try {
       console.log(`Getting video file URL for video ${videoId}`);
       
-      // Get video details first
-      const video = await this.getVideo(videoId);
-      if (!video) {
-        console.error(`Video ${videoId} not found`);
-        return null;
+      // Use Supabase only - no fallback
+      if (MIGRATION_CONFIG.useSupabaseForVideos) {
+        return await VideoServiceSupabase.getVideoFileUrl(videoId);
       }
       
-      // Verificando todos os possíveis campos onde o ID do vídeo pode estar
-      const videoFileId = video.video_id || video.videoFileId;
-      
-      if (!videoFileId) {
-        console.error(`Video ${videoId} has no video file ID (checked both video_id and videoFileId)`);
-        return null;
-      }
-      
-      console.log(`Attempting to get file URL for video ID: ${videoFileId}`);
-      
-      // Get video file URL
-      try {
-        const fileUrl = await wasabiService.getFileUrl(videoFileId);
-        console.log(`Video URL obtained: ${fileUrl}`);
-        return fileUrl;
-      } catch (error) {
-        console.error(`Error getting file URL:`, error);
-        console.error(`Video File ID: ${videoFileId}`);
-        return null;
-      }
+      throw new Error('Supabase is required for video operations');
     } catch (error) {
-      console.error(`Error getting video file URL for ${videoId}:`, error);
+      console.error(`Error getting video file URL for ${videoId} from Supabase:`, error);
       return null;
     }
   }

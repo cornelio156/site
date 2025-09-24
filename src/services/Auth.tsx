@@ -2,6 +2,8 @@ import { createContext, useContext, useState, useEffect } from 'react';
 import type { FC, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { jsonDatabaseService, UserData, SessionData } from './JSONDatabaseService';
+import { UserServiceSupabase } from './UserServiceSupabase';
+import { MIGRATION_CONFIG } from './MigrationService';
 
 // Define user type - mantém compatibilidade com o frontend
 interface User {
@@ -69,55 +71,37 @@ export const AuthProvider: FC<AuthProviderProps> = ({ children }) => {
     return () => clearInterval(intervalId);
   }, []);
 
-  // Login function using JSON database
+  // Login function using Supabase only
   const login = async (email: string, password: string, redirectPath?: string) => {
     try {
       setLoading(true);
       setError(null);
       
-      // First, query the JSON database to find the user with the provided email
-      const userData = await jsonDatabaseService.getUserByEmail(email);
-      
-      if (!userData) {
-        setError('Usuário não encontrado. Verifique suas credenciais.');
-        return;
+      // Use Supabase only - no fallback
+      if (MIGRATION_CONFIG.useSupabaseForUsers) {
+        console.log('Attempting login with Supabase');
+        const result = await UserServiceSupabase.login(email, password);
+        
+        if (result) {
+          setUser(result.user);
+          setIsAuthenticated(true);
+          setCurrentSession(result.session);
+          setSessionCheckedAt(Date.now());
+          
+          // Redirect after login if path is provided
+          if (redirectPath) {
+            navigate(redirectPath);
+          } else {
+            navigate('/admin');
+          }
+          return;
+        } else {
+          setError('Usuário não encontrado ou senha inválida.');
+          return;
+        }
       }
       
-      // Verify password hash using SHA256
-      const hashedPassword = await hashPasswordWithWebCrypto(password);
-      
-      if (hashedPassword !== userData.password) {
-        setError('Senha inválida. Tente novamente.');
-        return;
-      }
-      
-      // Create a new session for this user
-      const session = await createSession(userData.id);
-      
-      if (!session) {
-        setError('Falha ao criar sessão. Tente novamente.');
-        return;
-      }
-      
-      // Convert UserData to User for compatibility
-      const user: User = {
-        $id: userData.id,
-        email: userData.email,
-        name: userData.name,
-        password: userData.password,
-        created_at: userData.createdAt
-      };
-      
-      // Store user data and session in state
-      setUser(user);
-      setIsAuthenticated(true);
-      setCurrentSession(session);
-      setSessionCheckedAt(Date.now());
-      
-      // Redirect after login if path is provided
-      if (redirectPath) {
-        navigate(redirectPath, { replace: true });
-      }
+      throw new Error('Supabase is required for user authentication');
       
     } catch (err) {
       console.error('Login error:', err);
@@ -164,15 +148,11 @@ export const AuthProvider: FC<AuthProviderProps> = ({ children }) => {
     try {
       setLoading(true);
       
-      // If we have a session, deactivate it
-      if (currentSession) {
-        await deactivateSession(currentSession.id);
+      // Use Supabase only - no fallback
+      if (MIGRATION_CONFIG.useSupabaseForUsers) {
+        await UserServiceSupabase.logout();
       } else {
-        // If no session in state, try to get current session
-        const session = await getCurrentSession();
-        if (session) {
-          await deactivateSession(session.id);
-        }
+        throw new Error('Supabase is required for user authentication');
       }
       
       // Clear user data
@@ -271,52 +251,39 @@ export const AuthProvider: FC<AuthProviderProps> = ({ children }) => {
       
       setLoading(true);
       
-      // Get current session
-      const session = await getCurrentSession();
-      setCurrentSession(session);
-      setSessionCheckedAt(now);
-      
-      if (!session) {
-        // No valid session found
-        setUser(null);
-        setIsAuthenticated(false);
-        return;
-      }
-      
-      // Fetch user data from JSON database using the session's userId
-      try {
-        const userData = await jsonDatabaseService.getUser(session.userId);
+      // Use Supabase only - no fallback
+      if (MIGRATION_CONFIG.useSupabaseForUsers) {
+        console.log('Checking session with Supabase');
+        const session = await UserServiceSupabase.getCurrentSession();
+        setCurrentSession(session);
+        setSessionCheckedAt(now);
         
-        if (!userData) {
+        if (!session) {
+          // No valid session found
+          setUser(null);
+          setIsAuthenticated(false);
+          return;
+        }
+        
+        // Get user data from Supabase
+        const user = await UserServiceSupabase.getUserById(session.userId);
+        
+        if (!user) {
           // User not found, deactivate session
-          await deactivateSession(session.id);
+          await UserServiceSupabase.deactivateSession(session.id);
           setUser(null);
           setIsAuthenticated(false);
           setCurrentSession(null);
           return;
         }
         
-        // Convert UserData to User for compatibility
-        const user: User = {
-          $id: userData.id,
-          email: userData.email,
-          name: userData.name,
-          password: userData.password,
-          created_at: userData.createdAt
-        };
-        
         setUser(user);
         setIsAuthenticated(true);
-      } catch (err) {
-        // Error fetching user or user not found
-        console.error('Error fetching user data:', err);
-        setUser(null);
-        setIsAuthenticated(false);
-        
-        // Deactivate invalid session
-        await deactivateSession(session.id);
-        setCurrentSession(null);
+        return;
       }
+      
+      throw new Error('Supabase is required for user authentication');
+      
     } catch (err) {
       // Error checking session
       console.error('Session check error:', err);

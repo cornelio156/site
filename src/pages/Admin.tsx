@@ -4,8 +4,9 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../services/Auth';
 import { VideoService } from '../services/VideoService';
 import { wasabiService } from '../services/WasabiService';
-import { jsonDatabaseService } from '../services/JSONDatabaseService';
 import { useSiteConfig } from '../context/SiteConfigContext';
+import { UserServiceSupabase } from '../services/UserServiceSupabase';
+import { SiteConfigServiceSupabase } from '../services/SiteConfigServiceSupabase';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import SendIcon from '@mui/icons-material/Send';
 import Container from '@mui/material/Container';
@@ -116,7 +117,9 @@ interface Video {
   price: number;
   product_link?: string;
   video_id?: string;
+  videoFileId?: string;
   thumbnail_id?: string;
+  thumbnailFileId?: string;
   created_at: string;
   is_active: boolean;
   duration?: number;
@@ -324,21 +327,21 @@ const Admin: FC = () => {
       setLoading(true);
       setError(null);
       
-      const usersData = await jsonDatabaseService.getAllUsers();
+      const usersData = await UserServiceSupabase.getAllUsers();
       
       // Convert to admin format
-      const adminUsers = usersData.map(user => ({
+      const adminUsers = usersData.map((user: any) => ({
         $id: user.id,
         email: user.email,
         name: user.name,
         password: user.password,
-        created_at: user.createdAt
+        created_at: user.created_at
       })) as unknown as User[];
       
       setUsers(adminUsers);
     } catch (err) {
-      console.error('Error fetching users:', err);
-      setError('Failed to load users. Please try again.');
+      console.error('Error fetching users from Supabase:', err);
+      setError('Failed to load users from Supabase. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -350,7 +353,7 @@ const Admin: FC = () => {
       setLoading(true);
       setError(null);
       
-      const configData = await jsonDatabaseService.getSiteConfig();
+      const configData = await SiteConfigServiceSupabase.getSiteConfig();
       
       if (configData) {
         const config: SiteConfig = {
@@ -393,8 +396,8 @@ const Admin: FC = () => {
         }
       }
     } catch (err) {
-      console.error('Error fetching site config:', err);
-      setError('Failed to load site configuration');
+      console.error('Error fetching site config from Supabase:', err);
+      setError('Failed to load site configuration from Supabase');
     } finally {
       setLoading(false);
     }
@@ -445,7 +448,7 @@ const Admin: FC = () => {
       setLoading(true);
       setError(null);
       
-      const success = await jsonDatabaseService.deleteUser(id);
+      const success = await UserServiceSupabase.deleteUser(id);
       
       if (success) {
         showFeedback('User successfully deleted!', 'success');
@@ -454,7 +457,7 @@ const Admin: FC = () => {
         showFeedback('Failed to delete user', 'error');
       }
     } catch (err) {
-      console.error('Error deleting user:', err);
+      console.error('Error deleting user from Supabase:', err);
       showFeedback('Failed to delete user. Please try again.', 'error');
     } finally {
       setLoading(false);
@@ -547,8 +550,8 @@ const Admin: FC = () => {
       setUploadProgress(90);
 
       if (editingVideo) {
-        // Update existing video
-        const updatedVideo = await jsonDatabaseService.updateVideo(editingVideo, videoData);
+        // Update existing video using VideoService (which uses Supabase)
+        const updatedVideo = await VideoService.updateVideo(editingVideo, videoData);
         if (updatedVideo) {
           showFeedback('Video updated successfully!', 'success');
           fetchVideos();
@@ -558,8 +561,8 @@ const Admin: FC = () => {
           showFeedback('Failed to update video', 'error');
         }
       } else {
-        // Create new video
-        const newVideo = await jsonDatabaseService.createVideo(videoData);
+        // Create new video using VideoService (which uses Supabase)
+        const newVideo = await VideoService.createVideo(videoData);
         if (newVideo) {
           showFeedback('Video uploaded successfully!', 'success');
           fetchVideos();
@@ -619,14 +622,14 @@ const Admin: FC = () => {
         }
       };
 
-      await jsonDatabaseService.updateSiteConfig(configData);
+      await SiteConfigServiceSupabase.updateSiteConfig(configData);
       
       showFeedback('Configuration saved successfully!', 'success');
       setEditingConfig(false);
       fetchSiteConfig();
       
     } catch (err) {
-      console.error('Error saving configuration:', err);
+      console.error('Error saving configuration to Supabase:', err);
       showFeedback('Failed to save configuration. Please try again.', 'error');
     } finally {
       setLoading(false);

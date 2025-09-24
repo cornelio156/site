@@ -1,5 +1,8 @@
 import { createContext, useState, useContext, useEffect, ReactNode } from 'react';
-import { jsonDatabaseService, SiteConfigData } from '../services/JSONDatabaseService';
+import { jsonDatabaseService } from '../services/JSONDatabaseService';
+import type { SiteConfigData } from '../services/WasabiMetadataService';
+import { SiteConfigServiceSupabase } from '../services/SiteConfigServiceSupabase';
+import { MIGRATION_CONFIG } from '../services/MigrationService';
 
 // Define the site config interface - mantém compatibilidade com o frontend
 interface SiteConfig {
@@ -121,30 +124,43 @@ export const SiteConfigProvider = ({ children }: { children: ReactNode }) => {
       setLoading(true);
       setError(null);
       
-      // Primeiro, tentar carregar do JSON database
-      let configData: SiteConfigData | null = null;
-      
-      try {
-        configData = await jsonDatabaseService.getSiteConfig();
-      } catch (err) {
-        console.log('JSON database not available, trying to load from public file');
-        
-        // Se não conseguir do JSON database, carregar do arquivo público
-        try {
-          const response = await fetch('/site_config.json');
-          if (response.ok) {
-            configData = await response.json();
-          }
-        } catch (fileErr) {
-          console.error('Error loading from public file:', fileErr);
+      // Use Supabase only - no fallback
+      if (MIGRATION_CONFIG.useSupabaseForConfig) {
+        console.log('Loading site config from Supabase');
+        const supabaseConfig = await SiteConfigServiceSupabase.getSiteConfig();
+        if (supabaseConfig) {
+          // Convert Supabase config to SiteConfigData format
+          const configData: SiteConfigData = {
+            siteName: supabaseConfig.siteName,
+            paypalClientId: supabaseConfig.paypalClientId,
+            paypalMeUsername: supabaseConfig.paypalMeUsername,
+            stripePublishableKey: supabaseConfig.stripePublishableKey,
+            stripeSecretKey: supabaseConfig.stripeSecretKey,
+            telegramUsername: supabaseConfig.telegramUsername,
+            videoListTitle: supabaseConfig.videoListTitle,
+            crypto: supabaseConfig.crypto,
+            emailHost: supabaseConfig.emailHost,
+            emailPort: supabaseConfig.emailPort,
+            emailSecure: supabaseConfig.emailSecure,
+            emailUser: supabaseConfig.emailUser,
+            emailPass: supabaseConfig.emailPass,
+            emailFrom: supabaseConfig.emailFrom,
+            wasabiConfig: supabaseConfig.wasabiConfig
+          };
+          
+          const siteConfig = convertToSiteConfig(configData);
+          setConfig(siteConfig);
+        } else {
+          throw new Error('No configuration found in Supabase');
         }
-      }
-      
-      if (configData) {
-        const siteConfig = convertToSiteConfig(configData);
-        setConfig(siteConfig);
       } else {
-        // Usar configuração padrão se não conseguir carregar
+        throw new Error('Supabase is required for site configuration');
+      }
+    } catch (err) {
+      console.error('Error fetching site config from Supabase:', err);
+      setError('Failed to load site configuration from Supabase');
+      
+      // Use default configuration as fallback
         const defaultConfig: SiteConfig = {
           $id: 'site-config',
           site_name: 'VideosPlus',
@@ -170,10 +186,6 @@ export const SiteConfigProvider = ({ children }: { children: ReactNode }) => {
           }
         };
         setConfig(defaultConfig);
-      }
-    } catch (err) {
-      console.error('Error fetching site config:', err);
-      setError('Failed to load site configuration');
     } finally {
       setLoading(false);
     }
@@ -185,25 +197,26 @@ export const SiteConfigProvider = ({ children }: { children: ReactNode }) => {
       setLoading(true);
       setError(null);
       
-      // Obter configuração atual
-      const currentConfig = await jsonDatabaseService.getSiteConfig();
-      
-      // Mesclar com as atualizações
-      const updatedConfig: SiteConfigData = {
-        ...currentConfig,
-        ...updates
-      };
-      
-      // Salvar no JSON database
-      await jsonDatabaseService.updateSiteConfig(updatedConfig);
-      
-      // Atualizar estado local
+      // Use Supabase only - no fallback
+      if (MIGRATION_CONFIG.useSupabaseForConfig) {
+        console.log('Updating site config in Supabase');
+        const updatedConfig = await SiteConfigServiceSupabase.updateSiteConfig(updates);
+        
+        if (updatedConfig) {
+          // Convert to SiteConfig format
       const siteConfig = convertToSiteConfig(updatedConfig);
       setConfig(siteConfig);
+          return;
+        } else {
+          throw new Error('Failed to update configuration in Supabase');
+        }
+      } else {
+        throw new Error('Supabase is required for site configuration');
+      }
       
     } catch (err) {
-      console.error('Error updating site config:', err);
-      setError('Failed to update site configuration');
+      console.error('Error updating site config in Supabase:', err);
+      setError('Failed to update site configuration in Supabase');
       throw err;
     } finally {
       setLoading(false);

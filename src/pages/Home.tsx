@@ -125,7 +125,6 @@ const VideoCardLoading: FC<{ index: number }> = ({ index }) => {
 };
 
 const Home: FC = () => {
-  const [videos, setVideos] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
@@ -147,7 +146,6 @@ const Home: FC = () => {
         setLoading(true);
         setError(null);
         setLoadedVideos([]); // Reset loaded videos
-        setVideos([]); // Reset videos array
         
         // Get video IDs first (ultra-fast operation - no metadata loading)
         const allVideoIds = await VideoService.getVideoIds(SortOption.NEWEST);
@@ -190,8 +188,13 @@ const Home: FC = () => {
       try {
         const video = await VideoService.getVideo(videoId);
         if (video) {
-          setLoadedVideos(prev => [...prev, video]);
-          setVideos(prev => [...prev, video]);
+          setLoadedVideos(prev => {
+            // Check if video already exists to prevent duplicates
+            if (prev.some(v => v.$id === video.$id)) {
+              return prev;
+            }
+            return [...prev, video];
+          });
         }
       } catch (error) {
         console.error(`Error loading video ${videoId}:`, error);
@@ -210,13 +213,18 @@ const Home: FC = () => {
         const video = await VideoService.getVideo(videoId);
         
         if (video) {
-          // Add video immediately to both arrays
-          setLoadedVideos(prev => [...prev, video]);
-          setVideos(prev => [...prev, video]);
+          // Add video immediately to both arrays, checking for duplicates
+          setLoadedVideos(prev => {
+            // Check if video already exists to prevent duplicates
+            if (prev.some(v => v.$id === video.$id)) {
+              return prev;
+            }
+            return [...prev, video];
+          });
         }
         
         // Add a small delay between videos
-        await new Promise(resolve => setTimeout(resolve, 150));
+          await new Promise(resolve => setTimeout(resolve, 150));
       } catch (error) {
         console.error(`Error loading video ${videoId}:`, error);
         // Continue with next video even if current one fails
@@ -442,10 +450,10 @@ I'm here to answer your questions about our videos and services!
             <Typography variant="h4" component="h2" gutterBottom>
               {videoListTitle || 'Featured Videos'}
             </Typography>
-            {!loading && videos.length > 0 && (
+            {!loading && loadedVideos.length > 0 && (
               <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mt: 1, alignItems: 'center' }}>
                 <Chip 
-                  label={`From $${Math.min(...videos.map(v => v.price)).toFixed(2)}`}
+                  label={`From $${Math.min(...loadedVideos.map(v => v.price)).toFixed(2)}`}
                   size="small"
                   sx={{ 
                     backgroundColor: 'rgba(255, 15, 80, 0.1)',
@@ -455,7 +463,7 @@ I'm here to answer your questions about our videos and services!
                   }}
                 />
                 <Chip 
-                  label={`Up to $${Math.max(...videos.map(v => v.price)).toFixed(2)}`}
+                  label={`Up to $${Math.max(...loadedVideos.map(v => v.price)).toFixed(2)}`}
                   size="small"
                   sx={{ 
                     backgroundColor: 'rgba(255, 15, 80, 0.1)',
@@ -465,7 +473,7 @@ I'm here to answer your questions about our videos and services!
                   }}
                 />
                 <Chip 
-                  label={`Avg: $${(videos.reduce((sum, v) => sum + v.price, 0) / videos.length).toFixed(2)}`}
+                  label={`Avg: $${(loadedVideos.reduce((sum, v) => sum + v.price, 0) / loadedVideos.length).toFixed(2)}`}
                   size="small"
                   sx={{ 
                     backgroundColor: 'rgba(255, 15, 80, 0.1)',
@@ -483,9 +491,9 @@ I'm here to answer your questions about our videos and services!
                 />
                 
                 {/* Loading progress indicator */}
-                {isLoadingMore && loadedVideos.length < videos.length && (
+                {isLoadingMore && (
                   <Chip 
-                    label={`Loading ${loadedVideos.length}/${videos.length} videos...`}
+                    label={`Loading ${loadedVideos.length} videos...`}
                     size="small"
                     sx={{ 
                       backgroundColor: 'rgba(33, 150, 243, 0.1)',
@@ -562,7 +570,7 @@ I'm here to answer your questions about our videos and services!
               <Grid container spacing={3}>
                 {renderSkeletons()}
               </Grid>
-            ) : videos.length === 0 && !isLoadingMore ? (
+            ) : loadedVideos.length === 0 && !isLoadingMore ? (
               <Grow in={true} timeout={1000}>
                 <Alert 
                   severity="info" 

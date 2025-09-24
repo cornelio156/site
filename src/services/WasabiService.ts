@@ -157,10 +157,10 @@ class WasabiService {
     const timeout = 5000; // 5 segundos
     
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        // Usar o servidor para gerar URL assinada
-        const baseUrl = import.meta.env.DEV ? 'http://localhost:3000' : '';
-        const encodedFileId = encodeURIComponent(fileId);
+    try {
+      // Usar o servidor para gerar URL assinada
+      const baseUrl = import.meta.env.DEV ? 'http://localhost:3000' : '';
+      const encodedFileId = encodeURIComponent(fileId);
         console.log(`Requesting signed URL for fileId: ${fileId} (attempt ${attempt}/${maxRetries})`);
         
         // Criar AbortController para timeout
@@ -172,14 +172,14 @@ class WasabiService {
         });
         
         clearTimeout(timeoutId);
-        
-        if (response.ok) {
-          const result = await response.json();
-          if (result.success && result.url) {
-            console.log('Signed URL obtained:', result.url);
-            return result.url;
-          }
-        } else {
+      
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success && result.url) {
+          console.log('Signed URL obtained:', result.url);
+          return result.url;
+        }
+      } else {
           console.error(`Failed to get signed URL (attempt ${attempt}):`, response.status, response.statusText);
         }
         
@@ -188,7 +188,7 @@ class WasabiService {
           await new Promise(resolve => setTimeout(resolve, 1000 * attempt)); // Backoff exponencial
         }
         
-      } catch (error) {
+    } catch (error) {
         console.error(`Error getting signed URL (attempt ${attempt}):`, error);
         
         // Se for timeout ou erro de conexão, tentar novamente
@@ -236,10 +236,10 @@ class WasabiService {
       const timeout = 5000; // 5 segundos
       
       for (let attempt = 1; attempt <= maxRetries; attempt++) {
-        try {
-          // Usar o servidor para gerar URL assinada
-          const baseUrl = import.meta.env.DEV ? 'http://localhost:3000' : '';
-          const encodedThumbnailId = encodeURIComponent(thumbnailId);
+    try {
+      // Usar o servidor para gerar URL assinada
+      const baseUrl = import.meta.env.DEV ? 'http://localhost:3000' : '';
+      const encodedThumbnailId = encodeURIComponent(thumbnailId);
           console.log(`Requesting signed URL for thumbnailId: ${thumbnailId} (attempt ${attempt}/${maxRetries})`);
           
           // Criar AbortController para timeout
@@ -251,16 +251,16 @@ class WasabiService {
           });
           
           clearTimeout(timeoutId);
-          
-          if (response.ok) {
-            const result = await response.json();
-            if (result.success && result.url) {
-              console.log('Signed URL for thumbnail obtained:', result.url);
+      
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success && result.url) {
+          console.log('Signed URL for thumbnail obtained:', result.url);
               // Salvar no cache
               this.setCachedThumbnailUrl(thumbnailId, result.url);
-              return result.url;
-            }
-          } else {
+          return result.url;
+        }
+      } else {
             console.error(`Failed to get signed URL for thumbnail (attempt ${attempt}):`, response.status, response.statusText);
           }
           
@@ -287,10 +287,10 @@ class WasabiService {
       }
       
       console.warn('Failed to get signed URL for thumbnail after all attempts, falling back to direct URL');
-      
-      // Fallback para URL direta (pode não funcionar se o bucket for privado)
+    
+    // Fallback para URL direta (pode não funcionar se o bucket for privado)
       let fallbackUrl: string;
-      if (thumbnailId.startsWith('thumbnails/')) {
+    if (thumbnailId.startsWith('thumbnails/')) {
         fallbackUrl = `https://${this.config!.bucket}.s3.${this.config!.region}.wasabisys.com/${thumbnailId}`;
       } else {
         fallbackUrl = `https://${this.config!.bucket}.s3.${this.config!.region}.wasabisys.com/thumbnails/${thumbnailId}`;

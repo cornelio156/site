@@ -1,4 +1,4 @@
-// API Routes para o servidor SQLite
+// API Routes para o servidor - Supabase para metadados, Wasabi para arquivos
 import express from 'express';
 import { promises as fs } from 'fs';
 import path from 'path';
