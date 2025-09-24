@@ -15,6 +15,7 @@ import TelegramIcon from '@mui/icons-material/Telegram';
 import PreviewIcon from '@mui/icons-material/PlayCircleOutline';
 import { VideoService } from '../services/VideoService';
 import { useSiteConfig } from '../context/SiteConfigContext';
+import ThumbnailFallback from './ThumbnailFallback';
 
 interface VideoCardProps {
   video: {
@@ -146,10 +147,22 @@ ${video.description || 'No description available'}
     if (video.thumbnailUrl) {
       setIsThumbnailLoading(true);
       setThumbnailError(false);
+      
+      // Set timeout for thumbnail loading (10 seconds)
+      const timeoutId = setTimeout(() => {
+        if (isThumbnailLoading) {
+          console.warn(`Thumbnail loading timeout for video: ${video.title}`);
+          setThumbnailError(true);
+          setIsThumbnailLoading(false);
+        }
+      }, 10000);
+      
+      return () => clearTimeout(timeoutId);
     } else {
       setIsThumbnailLoading(false);
+      setThumbnailError(true);
     }
-  }, [video.thumbnailUrl]);
+  }, [video.thumbnailUrl, isThumbnailLoading]);
 
   const handleThumbnailLoad = () => {
     setIsThumbnailLoading(false);
@@ -272,32 +285,11 @@ ${video.description || 'No description available'}
 
         {/* Error state overlay */}
         {thumbnailError && (
-          <Box
-            sx={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              width: '100%',
-              height: '100%',
-              backgroundColor: '#0A0A0A',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 3,
-            }}
-          >
-            <Typography 
-              variant="body2" 
-              sx={{ 
-                color: '#666',
-                textAlign: 'center',
-                fontSize: '0.9rem'
-              }}
-            >
-              Video Thumbnail
-            </Typography>
-          </Box>
+          <ThumbnailFallback 
+            width="100%"
+            height="100%"
+            title={video.title}
+          />
         )}
         
         {/* Adult content indicator */}
