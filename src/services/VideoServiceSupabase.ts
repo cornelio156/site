@@ -335,8 +335,10 @@ export class VideoServiceSupabase {
         description: videoData.description,
         price: videoData.price,
         duration: videoData.duration,
-        video_file_id: videoData.videoFileId,
-        thumbnail_file_id: videoData.thumbnailFileId,
+        video_id: videoData.videoFileId,  // ✅ Corrigido: usar video_id em vez de video_file_id
+        video_file_id: videoData.videoFileId,  // ✅ Manter ambos para compatibilidade
+        thumbnail_id: videoData.thumbnailFileId,  // ✅ Adicionar thumbnail_id
+        thumbnail_file_id: videoData.thumbnailFileId,  // ✅ Manter ambos para compatibilidade
         product_link: videoData.productLink || '',
         is_active: true,
         views: 0,
