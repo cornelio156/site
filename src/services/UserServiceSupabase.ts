@@ -36,8 +36,9 @@ export class UserServiceSupabase {
         return null;
       }
 
-      // Verify password (assuming it's hashed)
-      if (userData.password !== password) {
+      // Hash the provided password and compare with stored hash
+      const hashedPassword = await this.hashPassword(password);
+      if (userData.password !== hashedPassword) {
         console.log('Invalid password for email:', email);
         return null;
       }
@@ -53,12 +54,15 @@ export class UserServiceSupabase {
 
       // Create session
       const sessionToken = this.generateSessionToken();
+      const sessionId = this.generateSessionId();
       const sessionData = {
+        id: sessionId,
         user_id: user.$id,
         token: sessionToken,
         user_agent: navigator.userAgent,
         expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 hours
-        is_active: true
+        is_active: true,
+        created_at: new Date().toISOString()
       };
 
       const session = await this.supabase.createSession(sessionData);
@@ -346,5 +350,19 @@ export class UserServiceSupabase {
       console.error('Error deleting user:', error);
       return false;
     }
+  }
+
+  // Hash password using Web Crypto API (browser)
+  private static async hashPassword(password: string): Promise<string> {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(password);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  // Generate unique session ID
+  private static generateSessionId(): string {
+    return 'session-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
   }
 }

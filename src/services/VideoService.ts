@@ -257,22 +257,25 @@ export class VideoService {
       // Limpar cache antes da operação para evitar inconsistências
       this.clearCache();
 
-      const newVideo = await jsonDatabaseService.createVideo({
-        title: videoData.title,
-        description: videoData.description,
-        price: videoData.price,
-        duration: videoData.duration.toString(),
-        videoFileId: videoData.videoFileId,
-        thumbnailFileId: videoData.thumbnailFileId,
-        productLink: videoData.productLink || '',
-        isActive: true,
-        isPurchased: false
-      });
+      // Use Supabase only - no fallback
+      if (MIGRATION_CONFIG.useSupabaseForVideos) {
+        const newVideo = await VideoServiceSupabase.createVideo({
+          title: videoData.title,
+          description: videoData.description,
+          price: videoData.price,
+          duration: videoData.duration.toString(),
+          videoFileId: videoData.videoFileId,
+          thumbnailFileId: videoData.thumbnailFileId,
+          productLink: videoData.productLink || ''
+        });
 
-      // Forçar atualização do cache após criação
-      await this.forceRefreshCache();
+        // Forçar atualização do cache após criação
+        await this.forceRefreshCache();
 
-      return this.convertVideoData(newVideo);
+        return newVideo;
+      }
+      
+      throw new Error('Supabase is required for video operations');
     } catch (error) {
       console.error('Error creating video:', error);
       return null;
@@ -293,21 +296,26 @@ export class VideoService {
       // Limpar cache antes da operação para evitar inconsistências
       this.clearCache();
 
-      const updateData: any = { ...updates };
-      if (updateData.duration) {
-        updateData.duration = updateData.duration.toString();
-      }
+      // Use Supabase only - no fallback
+      if (MIGRATION_CONFIG.useSupabaseForVideos) {
+        const updateData: any = { ...updates };
+        if (updateData.duration) {
+          updateData.duration = updateData.duration.toString();
+        }
 
-      const updatedVideo = await jsonDatabaseService.updateVideo(videoId, updateData);
+        const updatedVideo = await VideoServiceSupabase.updateVideo(videoId, updateData);
+        
+        if (!updatedVideo) {
+          return null;
+        }
+
+        // Forçar atualização do cache após atualização
+        await this.forceRefreshCache();
+
+        return updatedVideo;
+      }
       
-      if (!updatedVideo) {
-        return null;
-      }
-
-      // Forçar atualização do cache após atualização
-      await this.forceRefreshCache();
-
-      return this.convertVideoData(updatedVideo);
+      throw new Error('Supabase is required for video operations');
     } catch (error) {
       console.error('Error updating video:', error);
       return null;

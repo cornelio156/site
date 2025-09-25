@@ -220,13 +220,16 @@ export class SiteConfigServiceSupabase {
       await client.from('crypto_wallets').delete().neq('id', 0); // Delete all
       
       // Inserir novas carteiras
-      const walletsToInsert = cryptoWallets.map(wallet => {
-        const [type, address] = wallet.split(':');
-        return {
-          type: type.trim(),
-          address: address.trim()
-        };
-      });
+      const walletsToInsert = cryptoWallets
+        .filter(wallet => wallet && wallet.trim()) // Filtrar wallets vazias
+        .map(wallet => {
+          const [type, address] = wallet.split(':');
+          return {
+            type: type?.trim() || '',
+            address: address?.trim() || ''
+          };
+        })
+        .filter(wallet => wallet.type && wallet.address); // Filtrar wallets com dados válidos
       
       if (walletsToInsert.length > 0) {
         await client.from('crypto_wallets').insert(walletsToInsert);
