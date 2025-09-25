@@ -325,7 +325,12 @@ export class VideoServiceSupabase {
       this.clearCache();
 
       const client = this.supabase.getClient();
+      
+      // Gerar ID único para o vídeo
+      const videoId = this.generateVideoId();
+      
       const { data, error } = await client.from('videos').insert({
+        id: videoId,
         title: videoData.title,
         description: videoData.description,
         price: videoData.price,
@@ -334,7 +339,8 @@ export class VideoServiceSupabase {
         thumbnail_file_id: videoData.thumbnailFileId,
         product_link: videoData.productLink || '',
         is_active: true,
-        views: 0
+        views: 0,
+        created_at: new Date().toISOString()
       }).select().single();
 
       if (error) {
@@ -432,5 +438,12 @@ export class VideoServiceSupabase {
       console.error('Error deleting video:', error);
       return false;
     }
+  }
+
+  // Gerar ID único para vídeo
+  private static generateVideoId(): string {
+    const timestamp = Date.now();
+    const random = Math.random().toString(36).substring(2, 15);
+    return `video-${timestamp}-${random}`;
   }
 }
