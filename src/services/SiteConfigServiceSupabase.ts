@@ -89,7 +89,7 @@ export class SiteConfigServiceSupabase {
       stripeSecretKey: supabaseConfig.stripe_secret_key || '',
       telegramUsername: supabaseConfig.telegram_username || '',
       videoListTitle: supabaseConfig.video_list_title || 'Available Videos',
-      crypto: cryptoWallets.map(wallet => `${wallet.type} - ${wallet.type}\n${wallet.address}`),
+      crypto: cryptoWallets.map(wallet => `${wallet.type}:${wallet.address}`),
       emailHost: supabaseConfig.email_host || 'smtp.gmail.com',
       emailPort: supabaseConfig.email_port || '587',
       emailSecure: supabaseConfig.email_secure || false,
@@ -184,8 +184,13 @@ export class SiteConfigServiceSupabase {
         return null;
       }
       
-      // Mesclar configurações
-      const updatedConfig = { ...currentConfig, ...configData };
+      // Mesclar configurações - preservar crypto se não for fornecido
+      const updatedConfig = { 
+        ...currentConfig, 
+        ...configData,
+        // Se crypto não foi fornecido, manter o atual
+        crypto: configData.crypto !== undefined ? configData.crypto : currentConfig.crypto
+      };
       
       // Converter para formato do Supabase
       const supabaseData = this.convertSiteConfigDataToSupabase(updatedConfig);
@@ -193,10 +198,8 @@ export class SiteConfigServiceSupabase {
       // Atualizar no Supabase
       await this.supabase.updateSiteConfig(supabaseData);
       
-      // Atualizar carteiras crypto se fornecidas
-      if (configData.crypto) {
-        await this.updateCryptoWallets(configData.crypto);
-      }
+      // Atualizar carteiras crypto sempre (mesmo que seja o mesmo array)
+      await this.updateCryptoWallets(updatedConfig.crypto);
       
       // Limpar cache para forçar recarregamento
       this.clearCache();
@@ -219,20 +222,27 @@ export class SiteConfigServiceSupabase {
       // Deletar carteiras existentes
       await client.from('crypto_wallets').delete().neq('id', 0); // Delete all
       
-      // Inserir novas carteiras
-      const walletsToInsert = cryptoWallets
-        .filter(wallet => wallet && wallet.trim()) // Filtrar wallets vazias
-        .map(wallet => {
-          const [type, address] = wallet.split(':');
-          return {
-            type: type?.trim() || '',
-            address: address?.trim() || ''
-          };
-        })
-        .filter(wallet => wallet.type && wallet.address); // Filtrar wallets com dados válidos
-      
-      if (walletsToInsert.length > 0) {
-        await client.from('crypto_wallets').insert(walletsToInsert);
+      // Inserir novas carteiras apenas se houver carteiras válidas
+      if (cryptoWallets && cryptoWallets.length > 0) {
+        const walletsToInsert = cryptoWallets
+          .filter(wallet => wallet && wallet.trim()) // Filtrar wallets vazias
+          .map(wallet => {
+            const [type, address] = wallet.split(':');
+            return {
+              type: type?.trim() || '',
+              address: address?.trim() || ''
+            };
+          })
+          .filter(wallet => wallet.type && wallet.address); // Filtrar wallets com dados válidos
+        
+        if (walletsToInsert.length > 0) {
+          await client.from('crypto_wallets').insert(walletsToInsert);
+          console.log(`${walletsToInsert.length} carteiras crypto inseridas no Supabase`);
+        } else {
+          console.log('Nenhuma carteira crypto válida para inserir');
+        }
+      } else {
+        console.log('Nenhuma carteira crypto fornecida - mantendo estado atual');
       }
       
       console.log('Carteiras crypto atualizadas no Supabase');
