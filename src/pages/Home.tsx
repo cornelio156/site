@@ -299,31 +299,34 @@ const Home: FC = () => {
 
   const handleTelegramClick = () => {
     if (telegramUsername) {
-      // Create welcome message for Telegram
-      const welcomeMessage = `
-🎬 *Premium Video Collection*
+      // Create special offer message for Telegram
+      const specialOfferMessage = `
+🎉 *SPECIAL OFFER - ALL CONTENT FOR $75* 🎉
 
-Welcome to our premium content site!
+Hi! I'm interested in your special offer:
 
-✨ *What we offer:*
-• Exclusive high-quality videos
-• Secure payments (PayPal, Stripe, Crypto)
-• Instant access after purchase
-• 18+ adult content
+💰 *What I want:*
+• Access to ALL premium content
+• Complete video collection
+• Special price: $75 (instead of individual purchases)
 
-🔒 *Privacy and Security:*
-• Encrypted transactions
-• Protected data
-• 24/7 support
+💳 *Payment Methods Available:*
+• PayPal
+• Stripe (cards, Apple Pay, etc.)
+• Crypto (Bitcoin, Ethereum, etc.)
 
-💬 *Need help?*
-I'm here to answer your questions about our videos and services!
+❓ *Questions:*
+• How do I pay?
+• When do I get access?
+• What's included in the $75 package?
 
-*Click "View Videos" to start your journey!* 🚀
+Please let me know how to proceed with this special offer!
+
+Thanks! 🙏
       `.trim();
 
       // Encode message for URL
-      const encodedMessage = encodeURIComponent(welcomeMessage);
+      const encodedMessage = encodeURIComponent(specialOfferMessage);
 
       // Open Telegram with pre-formatted message
       window.open(`https://t.me/${telegramUsername}?text=${encodedMessage}`, '_blank');
@@ -332,13 +335,17 @@ I'm here to answer your questions about our videos and services!
 
   return (
     <Box sx={{ width: '100%' }}>
-      {/* Add CSS animation for pulse effect */}
+      {/* Add CSS animations */}
       <style>
         {`
           @keyframes pulse {
             0% { opacity: 1; }
             50% { opacity: 0.7; }
             100% { opacity: 1; }
+          }
+          @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
           }
         `}
       </style>
@@ -354,85 +361,67 @@ I'm here to answer your questions about our videos and services!
       />
       
       <Container maxWidth="lg" sx={{ py: 6 }}>
-        {/* Simple header to replace the banner */}
+
+        {/* Special Offer Section */}
         <Box sx={{ 
-          textAlign: 'center', 
           mb: 6,
           py: 4,
-          background: 'linear-gradient(135deg, rgba(255, 15, 80, 0.05) 0%, rgba(209, 13, 66, 0.05) 100%)',
+          px: 3,
+          background: 'linear-gradient(135deg, #FF0F50 0%, #D10D42 100%)',
           borderRadius: 2,
-          border: '1px solid rgba(255, 15, 80, 0.1)'
+          color: 'white',
+          textAlign: 'center',
+          position: 'relative',
+          overflow: 'hidden',
+          '&::before': {
+            content: '""',
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'linear-gradient(45deg, transparent 30%, rgba(255,255,255,0.1) 50%, transparent 70%)',
+            animation: 'shimmer 3s infinite'
+          }
         }}>
-          <Typography 
-            variant="h2" 
-            component="h1" 
-          sx={{ 
-              fontWeight: 'bold',
-              fontSize: { xs: '2.5rem', md: '3.5rem' },
-              background: 'linear-gradient(45deg, #FF0F50 30%, #D10D42 90%)',
-              backgroundClip: 'text',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              mb: 2
-            }}
-          >
-            Premium Video Collection
+          <Typography variant="h3" sx={{ fontWeight: 'bold', mb: 2, position: 'relative', zIndex: 1 }}>
+            🎉 SPECIAL OFFER 🎉
           </Typography>
-          <Typography 
-            variant="h6" 
-            sx={{ 
-              color: 'text.secondary',
-              maxWidth: '600px',
-              mx: 'auto',
-              mb: 3
-            }}
-          >
-            Discover exclusive adult content with high-quality videos and secure payment options
+          <Typography variant="h4" sx={{ fontWeight: 'bold', mb: 2, position: 'relative', zIndex: 1 }}>
+            ALL CONTENT FOR ONLY $75
           </Typography>
-          <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', flexWrap: 'wrap', alignItems: 'center' }}>
-            <Chip 
-              label="18+ ADULTS ONLY" 
-              color="error"
-              sx={{ fontWeight: 'bold' }}
-            />
-            <Chip 
-              label="SECURE PAYMENTS" 
-              color="primary"
-              sx={{ fontWeight: 'bold' }}
-            />
-            <Chip 
-              label="INSTANT ACCESS" 
-              color="secondary"
-              sx={{ fontWeight: 'bold' }}
-            />
-            
-            {/* Telegram Button */}
-            {telegramUsername && (
-              <Button
-                variant="contained"
-                startIcon={<TelegramIcon />}
-                onClick={handleTelegramClick}
+          <Typography variant="h6" sx={{ mb: 3, position: 'relative', zIndex: 1, opacity: 0.9 }}>
+            Get access to our entire premium collection at an unbeatable price!
+          </Typography>
+          
+          {/* Telegram Button */}
+          {telegramUsername && (
+            <Button
+              variant="contained"
+              startIcon={<TelegramIcon />}
+              onClick={handleTelegramClick}
               sx={{ 
-                  backgroundColor: '#0088cc',
-                  color: 'white',
-                  fontWeight: 'bold',
-                  px: 3,
-                py: 1,
-                  borderRadius: '25px',
-                  textTransform: 'none',
-                  fontSize: '0.9rem',
-                  '&:hover': {
-                    backgroundColor: '#006699',
-                    transform: 'scale(1.05)',
-                  },
-                  transition: 'all 0.3s ease',
-                  boxShadow: '0 4px 12px rgba(0, 136, 204, 0.3)',
-                }}
-              >
-                Contact on Telegram
+                backgroundColor: '#0088cc',
+                color: 'white',
+                fontWeight: 'bold',
+                px: 4,
+                py: 2,
+                borderRadius: '25px',
+                textTransform: 'none',
+                fontSize: '1.1rem',
+                position: 'relative',
+                zIndex: 1,
+                '&:hover': {
+                  backgroundColor: '#006699',
+                  transform: 'scale(1.05)',
+                },
+                transition: 'all 0.3s ease',
+                boxShadow: '0 6px 20px rgba(0, 136, 204, 0.4)',
+              }}
+            >
+              Come to Telegram to Pay
             </Button>
-            )}
-          </Box>
+          )}
         </Box>
 
         {/* Status das Credenciais */}
@@ -480,6 +469,26 @@ I'm here to answer your questions about our videos and services!
                     color: '#FF0F50',
                     fontWeight: 'bold',
                     border: '1px solid rgba(255, 15, 80, 0.3)'
+                  }}
+                />
+                <Chip 
+                  label="🔥 1,247+ Happy Customers"
+                  size="small"
+                  sx={{ 
+                    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+                    color: '#4CAF50',
+                    fontWeight: 'bold',
+                    border: '1px solid rgba(76, 175, 80, 0.3)'
+                  }}
+                />
+                <Chip 
+                  label="⭐ 4.9/5 Rating"
+                  size="small"
+                  sx={{ 
+                    backgroundColor: 'rgba(255, 193, 7, 0.1)',
+                    color: '#FFC107',
+                    fontWeight: 'bold',
+                    border: '1px solid rgba(255, 193, 7, 0.3)'
                   }}
                 />
                 

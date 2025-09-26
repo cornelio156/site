@@ -84,7 +84,6 @@ const VideoPlayer: FC = () => {
   const [showPrePaymentModal, setShowPrePaymentModal] = useState(false);
   const [paymentType, setPaymentType] = useState<'stripe' | 'paypal' | null>(null);
   const [redirectCountdown, setRedirectCountdown] = useState(10);
-  const [linkStatus, setLinkStatus] = useState<'checking' | 'working' | 'broken' | 'unknown'>('unknown');
   const [copiedLinkIndex, setCopiedLinkIndex] = useState<number | null>(null);
   const theme = useTheme();
 
@@ -175,12 +174,6 @@ const VideoPlayer: FC = () => {
     loadVideo();
   }, [id, user]);
 
-  // Verificar link do produto quando o vídeo for carregado
-  useEffect(() => {
-    if (video?.product_link) {
-      checkProductLink(video.product_link);
-    }
-  }, [video?.product_link]);
 
   const handleTelegramRedirect = () => {
     if (telegramUsername && video) {
@@ -341,71 +334,6 @@ ${video.description || 'No description available'}
     return productNames[randomIndex];
   };
 
-  // Função para verificar se o link do produto está funcionando
-  const checkProductLink = async (url: string) => {
-    if (!url) {
-      setLinkStatus('unknown');
-      return;
-    }
-
-    setLinkStatus('checking');
-    
-    try {
-      // Verificar se a URL é válida
-      if (!isValidUrl(url)) {
-        setLinkStatus('broken');
-        return;
-      }
-
-      // Simular verificação de link (sem fazer requisição real devido a CORS)
-      // Em produção, você pode implementar um endpoint no seu servidor para verificar links
-      setTimeout(() => {
-        // Simular diferentes status baseado no tipo de URL
-        if (url.includes('http://') || url.includes('https://')) {
-          // URLs que começam com http/https são consideradas válidas
-          setLinkStatus('working');
-        } else if (url.includes('@') || url.includes('t.me/')) {
-          // Links do Telegram são considerados válidos
-          setLinkStatus('working');
-        } else if (url.length < 5) {
-          // URLs muito curtas são consideradas inválidas
-          setLinkStatus('broken');
-      } else {
-          // Outros casos são considerados desconhecidos
-          setLinkStatus('unknown');
-      }
-      }, 1000);
-
-    } catch (error) {
-      console.error('Erro ao verificar link:', error);
-      setLinkStatus('unknown');
-    }
-  };
-
-  // Função auxiliar para validar URL
-  const isValidUrl = (string: string): boolean => {
-    try {
-      // Verificar se é uma URL válida
-      if (string.startsWith('http://') || string.startsWith('https://')) {
-        new URL(string);
-        return true;
-      }
-      
-      // Verificar se é um link do Telegram
-      if (string.includes('t.me/') || string.includes('@')) {
-        return true;
-      }
-      
-      // Verificar se é um link válido sem protocolo
-      if (string.includes('.') && string.length > 3) {
-        return true;
-      }
-      
-      return false;
-    } catch (_) {
-      return false;
-    }
-  };
 
   // Generate PDF with product link
   const generatePDF = () => {
@@ -581,7 +509,7 @@ ${video.description || 'No description available'}
             buyerName: orderData?.payer?.name?.given_name,
             transactionId: orderData.id,
             paymentMethod: 'paypal',
-            timestamp: new Date().toLocaleString('pt-BR'),
+            timestamp: new Date().toLocaleString('en-US'),
             videoUrl: `${window.location.origin}/video/${video.$id}`
           });
         } catch (telegramError) {
@@ -824,7 +752,7 @@ ${video.description || 'No description available'}
                 }}
               >
                 <source src={previewUrl} type="video/mp4" />
-                Seu navegador não suporta o elemento de vídeo.
+                Your browser does not support the video element.
               </video>
             </Box>
           ) : (
@@ -1089,46 +1017,35 @@ ${video.description || 'No description available'}
                           color: 'white',
                           fontWeight: 'bold',
                           fontSize: 16,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: 1,
                           '&:hover': {
                             backgroundColor: '#4b45c6',
                           }
                         }}
                       >
-                        {isStripeLoading ? (
-                          'Processing...'
-                        ) : (
-                          <>
-                            {/* Apple Pay Icon */}
-                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 20, height: 20, bgcolor: 'white', borderRadius: 1 }}>
-                              <Typography variant="caption" sx={{ fontSize: '8px', fontWeight: 'bold', color: 'black' }}>🍎</Typography>
-                            </Box>
-                            
-                            {/* Amazon Pay Icon */}
-                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 20, height: 20, bgcolor: '#FF9900', borderRadius: 1 }}>
-                              <Typography variant="caption" sx={{ fontSize: '6px', fontWeight: 'bold', color: 'white' }}>A</Typography>
-                            </Box>
-                            
-                            {/* Visa Icon */}
-                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 20, height: 20, bgcolor: '#1A1F71', borderRadius: 1 }}>
-                              <Typography variant="caption" sx={{ fontSize: '7px', fontWeight: 'bold', color: 'white' }}>VISA</Typography>
-                            </Box>
-                            
-                            {/* Mastercard Icon */}
-                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 20, height: 20, bgcolor: 'white', borderRadius: 1, position: 'relative' }}>
-                              <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: '#EB001B', position: 'absolute', left: 6 }} />
-                              <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: '#F79E1B', position: 'absolute', right: 6 }} />
-                            </Box>
-                            
-                            <Typography variant="body2" sx={{ ml: 1, fontSize: '14px', fontWeight: 'bold' }}>
-                              Pay Securely
-                            </Typography>
-                          </>
-                        )}
+                        {isStripeLoading ? 'Processing...' : 'Pay Now'}
                       </Button>
+                      
+                      {/* Information text field */}
+                      <TextField
+                        fullWidth
+                        multiline
+                        rows={2}
+                        value="You will automatically receive the content link immediately after successful payment. No manual confirmation required."
+                        InputProps={{
+                          readOnly: true,
+                          sx: { 
+                            color: theme.palette.mode === 'dark' ? 'white' : theme.palette.text.primary,
+                            bgcolor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
+                            fontSize: '0.875rem',
+                            '& .MuiInputBase-input': {
+                              textAlign: 'center',
+                              fontWeight: 'bold'
+                            }
+                          }
+                        }}
+                        variant="outlined"
+                        sx={{ mt: 1 }}
+                      />
                     </Box>
                   )}
                   
@@ -1281,35 +1198,7 @@ ${video.description || 'No description available'}
             
             {video?.product_link ? (
               <Box sx={{ mb: 4 }}>
-                {/* Status do Link */}
-                <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-                  {linkStatus === 'checking' && (
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <CircularProgress size={16} />
-                      <Typography variant="body2" color="text.secondary">
-                        Verificando link...
-                      </Typography>
-                    </Box>
-                  )}
-                  {linkStatus === 'working' && (
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <CheckCircleIcon sx={{ color: 'success.main', fontSize: 20 }} />
-                      <Typography variant="body2" color="success.main">
-                        Link funcionando corretamente
-                      </Typography>
-                    </Box>
-                  )}
-                  {linkStatus === 'broken' && (
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <CloseIcon sx={{ color: 'error.main', fontSize: 20 }} />
-                      <Typography variant="body2" color="error.main">
-                        Link não está funcionando - Notificação enviada para suporte
-                      </Typography>
-                    </Box>
-                  )}
-                </Box>
-
-                {/* Links individuais */}
+                {/* Individual Links */}
                 {getProductLinks().map((link, index) => (
                   <Box key={index} sx={{ mb: 2 }}>
                     <Typography variant="body2" sx={{ mb: 1, fontWeight: 'bold' }}>
@@ -1341,7 +1230,7 @@ ${video.description || 'No description available'}
                   </Box>
                 ))}
 
-                {/* Botão para copiar todos os links */}
+                {/* Button to copy all links */}
                 {getProductLinks().length > 1 && (
                   <Box sx={{ mb: 2 }}>
                     <Button
@@ -1363,24 +1252,6 @@ ${video.description || 'No description available'}
                     </Button>
                   </Box>
                 )}
-
-                {/* Botão para verificar link manualmente */}
-                <Box sx={{ mt: 1, display: 'flex', justifyContent: 'center' }}>
-                  <Button
-                    variant="outlined"
-                    size="small"
-                    onClick={() => {
-                      if (video?.product_link) {
-                        checkProductLink(video.product_link);
-                      }
-                    }}
-                    disabled={linkStatus === 'checking'}
-                    startIcon={linkStatus === 'checking' ? <CircularProgress size={16} /> : null}
-                    sx={{ fontSize: '0.75rem' }}
-                  >
-                    {linkStatus === 'checking' ? 'Verificando...' : 'Verificar Link'}
-                  </Button>
-                </Box>
               </Box>
             ) : (
               <Alert severity="info" sx={{ mb: 4 }}>
@@ -1546,7 +1417,7 @@ ${video.description || 'No description available'}
         </Fade>
       </Modal>
       
-      {/* Modal de pré-pagamento */}
+      {/* Payment Processing Modal */}
       <Modal
         open={showPrePaymentModal}
         onClose={() => setShowPrePaymentModal(false)}
@@ -1562,7 +1433,7 @@ ${video.description || 'No description available'}
             top: '50%',
             left: '50%',
             transform: 'translate(-50%, -50%)',
-            width: { xs: '95%', sm: 400 },
+            width: { xs: '95%', sm: 450 },
             maxWidth: 500,
             bgcolor: theme.palette.mode === 'dark' ? '#1e1e1e' : theme.palette.background.paper,
             border: '2px solid #E50914',
@@ -1588,6 +1459,21 @@ ${video.description || 'No description available'}
             
             <Alert severity="info" sx={{ mb: 3 }}>
               For your privacy, a generic product name will appear during checkout.
+            </Alert>
+            
+            <Alert severity="warning" sx={{ mb: 3 }}>
+              <Typography variant="body2" sx={{ fontWeight: 'bold', mb: 1 }}>
+                Important Payment Instructions:
+              </Typography>
+              <Typography variant="body2" sx={{ mb: 1 }}>
+                • You have ONE attempt to complete the payment
+              </Typography>
+              <Typography variant="body2" sx={{ mb: 1 }}>
+                • If payment is declined, contact us via Telegram for assistance
+              </Typography>
+              <Typography variant="body2">
+                • For alternative payment methods, please contact us via Telegram
+              </Typography>
             </Alert>
             
             <Typography variant="body2" sx={{ mb: 2, color: theme.palette.mode === 'dark' ? '#aaa' : '#777', display: 'flex', justifyContent: 'space-between' }}>
