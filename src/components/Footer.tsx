@@ -12,13 +12,11 @@ import WarningIcon from '@mui/icons-material/Warning';
 import Divider from '@mui/material/Divider';
 import LockIcon from '@mui/icons-material/Lock';
 import SettingsIcon from '@mui/icons-material/Settings';
-import { useNavigate } from 'react-router-dom';
 
 const Footer: FC = () => {
   const currentYear = new Date().getFullYear();
   const theme = useTheme();
   const { siteName } = useSiteConfig();
-  const navigate = useNavigate();
   const [showSecretButton, setShowSecretButton] = useState(false);
   const [credentials, setCredentials] = useState({ projectId: '', apiKey: '' });
   
@@ -26,9 +24,6 @@ const Footer: FC = () => {
     window.open('https://t.me/admUnlock', '_blank');
   };
   
-  const handleAdminAccess = () => {
-    navigate('/login');
-  };
 
   // Detectar combinação de teclas para mostrar botão secreto (Ctrl + Alt + S)
   useEffect(() => {
@@ -191,20 +186,6 @@ const Footer: FC = () => {
             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)', mr: 2 }}>
               By accessing this site you agree that you are at least 18 years old
             </Typography>
-            <Button 
-              variant="contained" 
-              size="small"
-              startIcon={<LockIcon />}
-              onClick={handleAdminAccess}
-              sx={{ 
-                bgcolor: '#FF0F50', 
-                '&:hover': { 
-                  bgcolor: '#D00030' 
-                }
-              }}
-            >
-              Admin
-            </Button>
             
             {/* Botão secreto - aparece com Ctrl + Alt + S */}
             {showSecretButton && (

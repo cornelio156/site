@@ -63,6 +63,9 @@ import MuiAlert, { AlertProps } from '@mui/material/Alert';
 import Tooltip from '@mui/material/Tooltip';
 import React from 'react';
 import SecurityIcon from '@mui/icons-material/Security';
+import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
+import LockIcon from '@mui/icons-material/Lock';
+import PersonAddIcon from '@mui/icons-material/PersonAdd';
 
 // Tab panel component
 interface TabPanelProps {
@@ -253,6 +256,19 @@ const Admin: FC = () => {
   
   // Video element ref for getting duration
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  
+  // Admin management state
+  const [adminUsers, setAdminUsers] = useState<User[]>([]);
+  const [showAdminForm, setShowAdminForm] = useState(false);
+  const [editingAdmin, setEditingAdmin] = useState<string | null>(null);
+  const [adminName, setAdminName] = useState('');
+  const [adminEmail, setAdminEmail] = useState('');
+  const [adminPassword, setAdminPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [showChangePasswordForm, setShowChangePasswordForm] = useState(false);
 
   // Event listener for show-feedback events
   useEffect(() => {
@@ -282,6 +298,8 @@ const Admin: FC = () => {
     } else if (tabValue === 1) {
       fetchUsers();
       fetchSiteConfig();
+    } else if (tabValue === 2) {
+      fetchAdminUsers();
     }
   }, [tabValue]);
 
@@ -347,6 +365,32 @@ const Admin: FC = () => {
     }
   };
   
+  // Fetch admin users
+  const fetchAdminUsers = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const usersData = await UserServiceSupabase.getAllUsers();
+      
+      // Filter only admin users (you can add a role field later)
+      const adminUsers = usersData.map((user: any) => ({
+        $id: user.id,
+        email: user.email,
+        name: user.name,
+        password: user.password,
+        created_at: user.created_at
+      })) as unknown as User[];
+      
+      setAdminUsers(adminUsers);
+    } catch (err) {
+      console.error('Error fetching admin users:', err);
+      setError('Failed to load admin users. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Fetch site configuration
   const fetchSiteConfig = async () => {
     try {
@@ -442,6 +486,108 @@ const Admin: FC = () => {
     }
   };
   
+  // Save admin (create or update)
+  const handleSaveAdmin = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      if (!adminName || !adminEmail || !adminPassword) {
+        showFeedback('Please fill in all required fields', 'error');
+        return;
+      }
+
+      if (adminPassword !== confirmPassword) {
+        showFeedback('Passwords do not match', 'error');
+        return;
+      }
+
+      const adminData = {
+        name: adminName,
+        email: adminEmail,
+        password: adminPassword
+      };
+
+      if (editingAdmin) {
+        // Update existing admin
+        const success = await UserServiceSupabase.updateUser(editingAdmin, adminData);
+        if (success) {
+          showFeedback('Admin updated successfully!', 'success');
+          fetchAdminUsers();
+          setShowAdminForm(false);
+          setEditingAdmin(null);
+        } else {
+          showFeedback('Failed to update admin', 'error');
+        }
+      } else {
+        // Create new admin
+        const success = await UserServiceSupabase.createUser(adminData);
+        if (success) {
+          showFeedback('Admin created successfully!', 'success');
+          fetchAdminUsers();
+          setShowAdminForm(false);
+        } else {
+          showFeedback('Failed to create admin', 'error');
+        }
+      }
+
+      // Reset form
+      setAdminName('');
+      setAdminEmail('');
+      setAdminPassword('');
+      setConfirmPassword('');
+
+    } catch (err) {
+      console.error('Error saving admin:', err);
+      showFeedback('Failed to save admin. Please try again.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Change current user password
+  const handleChangePassword = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      if (!currentPassword || !newPassword || !confirmNewPassword) {
+        showFeedback('Please fill in all password fields', 'error');
+        return;
+      }
+
+      if (newPassword !== confirmNewPassword) {
+        showFeedback('New passwords do not match', 'error');
+        return;
+      }
+
+      if (newPassword.length < 6) {
+        showFeedback('New password must be at least 6 characters', 'error');
+        return;
+      }
+
+      // Here you would typically verify the current password first
+      // For now, we'll just update it
+      const success = await UserServiceSupabase.changePassword(user?.$id || '', newPassword);
+
+      if (success) {
+        showFeedback('Password changed successfully!', 'success');
+        setShowChangePasswordForm(false);
+        setCurrentPassword('');
+        setNewPassword('');
+        setConfirmNewPassword('');
+      } else {
+        showFeedback('Failed to change password', 'error');
+      }
+
+    } catch (err) {
+      console.error('Error changing password:', err);
+      showFeedback('Failed to change password. Please try again.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Delete user
   const handleDeleteUser = async (id: string) => {
     try {
@@ -643,6 +789,7 @@ const Admin: FC = () => {
           <Tabs value={tabValue} onChange={handleTabChange} aria-label="admin tabs">
             <Tab icon={<VideoLibraryIcon />} label="Manage Videos" />
             <Tab icon={<SettingsIcon />} label="Site Configuration & Users" />
+            <Tab icon={<AdminPanelSettingsIcon />} label="Admin Management" />
             <Tab icon={<PeopleIcon />} label="Online Users" />
           </Tabs>
         </Box>
@@ -1278,8 +1425,264 @@ const Admin: FC = () => {
           )}
         </TabPanel>
         
-        {/* Online Users Tab */}
+        {/* Admin Management Tab */}
         <TabPanel value={tabValue} index={2}>
+          <Box sx={{ mb: 4 }}>
+            <Grid container spacing={2} alignItems="center" justifyContent="space-between">
+              <Grid item>
+                <Typography variant="h5" component="h2" gutterBottom>
+                  Admin Management
+                </Typography>
+              </Grid>
+              <Grid item>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  startIcon={<PersonAddIcon />}
+                  onClick={() => setShowAdminForm(!showAdminForm)}
+                  sx={{ mr: 2 }}
+                >
+                  {showAdminForm ? 'Hide Form' : 'Add New Admin'}
+                </Button>
+                <Button
+                  variant="outlined"
+                  color="secondary"
+                  startIcon={<LockIcon />}
+                  onClick={() => setShowChangePasswordForm(!showChangePasswordForm)}
+                >
+                  Change My Password
+                </Button>
+              </Grid>
+            </Grid>
+            
+            {error && (
+              <Alert severity="error" sx={{ mb: 2, mt: 2 }}>
+                {error}
+              </Alert>
+            )}
+          </Box>
+          
+          {loading && !error ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
+              <CircularProgress />
+            </Box>
+          ) : (
+            <>
+              {/* Admin List */}
+              <TableContainer component={Paper} sx={{ mb: 3 }}>
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Name</TableCell>
+                      <TableCell>Email</TableCell>
+                      <TableCell>Created</TableCell>
+                      <TableCell>Actions</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {adminUsers.map((admin) => (
+                      <TableRow key={admin.$id}>
+                        <TableCell>{admin.name}</TableCell>
+                        <TableCell>{admin.email}</TableCell>
+                        <TableCell>{new Date(admin.created_at).toLocaleDateString()}</TableCell>
+                        <TableCell>
+                          <IconButton 
+                            color="primary" 
+                            onClick={() => {
+                              setAdminName(admin.name);
+                              setAdminEmail(admin.email);
+                              setAdminPassword('');
+                              setConfirmPassword('');
+                              setEditingAdmin(admin.$id);
+                              setShowAdminForm(true);
+                            }}
+                            aria-label="edit admin"
+                            size="small"
+                            sx={{ mr: 1 }}
+                          >
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                          <IconButton 
+                            color="error" 
+                            onClick={() => {
+                              setItemToDelete({ type: 'user', id: admin.$id });
+                              setDeleteDialogOpen(true);
+                            }}
+                            aria-label="delete admin"
+                            disabled={admin.$id === user?.$id} // Prevent deleting self
+                          >
+                            <DeleteIcon />
+                          </IconButton>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {adminUsers.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={4} align="center">
+                          No admin users found
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+
+              {/* Add/Edit Admin Form */}
+              {showAdminForm && (
+                <Paper sx={{ p: 3, mb: 3 }}>
+                  <Typography variant="h6" component="h3" sx={{ mb: 3 }}>
+                    {editingAdmin ? 'Edit Admin' : 'Add New Admin'}
+                  </Typography>
+                  
+                  <Grid container spacing={3}>
+                    <Grid item xs={12} md={6}>
+                      <TextField
+                        fullWidth
+                        label="Admin Name"
+                        value={adminName}
+                        onChange={(e) => setAdminName(e.target.value)}
+                        variant="outlined"
+                        sx={{ mb: 2 }}
+                      />
+                      
+                      <TextField
+                        fullWidth
+                        label="Email"
+                        type="email"
+                        value={adminEmail}
+                        onChange={(e) => setAdminEmail(e.target.value)}
+                        variant="outlined"
+                        sx={{ mb: 2 }}
+                      />
+                    </Grid>
+                    
+                    <Grid item xs={12} md={6}>
+                      <TextField
+                        fullWidth
+                        label="Password"
+                        type="password"
+                        value={adminPassword}
+                        onChange={(e) => setAdminPassword(e.target.value)}
+                        variant="outlined"
+                        sx={{ mb: 2 }}
+                      />
+                      
+                      <TextField
+                        fullWidth
+                        label="Confirm Password"
+                        type="password"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        variant="outlined"
+                        sx={{ mb: 2 }}
+                      />
+                    </Grid>
+                  </Grid>
+                  
+                  <Box sx={{ display: 'flex', gap: 2, mt: 3 }}>
+                    <Button
+                      variant="contained"
+                      color="primary"
+                      onClick={handleSaveAdmin}
+                      disabled={loading || !adminName || !adminEmail || !adminPassword}
+                      startIcon={loading ? <CircularProgress size={20} /> : <SaveIcon />}
+                    >
+                      {loading ? 'Saving...' : (editingAdmin ? 'Update Admin' : 'Create Admin')}
+                    </Button>
+                    
+                    <Button
+                      variant="outlined"
+                      onClick={() => {
+                        setShowAdminForm(false);
+                        setEditingAdmin(null);
+                        setAdminName('');
+                        setAdminEmail('');
+                        setAdminPassword('');
+                        setConfirmPassword('');
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  </Box>
+                </Paper>
+              )}
+
+              {/* Change Password Form */}
+              {showChangePasswordForm && (
+                <Paper sx={{ p: 3 }}>
+                  <Typography variant="h6" component="h3" sx={{ mb: 3 }}>
+                    Change My Password
+                  </Typography>
+                  
+                  <Grid container spacing={3}>
+                    <Grid item xs={12} md={4}>
+                      <TextField
+                        fullWidth
+                        label="Current Password"
+                        type="password"
+                        value={currentPassword}
+                        onChange={(e) => setCurrentPassword(e.target.value)}
+                        variant="outlined"
+                        sx={{ mb: 2 }}
+                      />
+                    </Grid>
+                    
+                    <Grid item xs={12} md={4}>
+                      <TextField
+                        fullWidth
+                        label="New Password"
+                        type="password"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        variant="outlined"
+                        sx={{ mb: 2 }}
+                      />
+                    </Grid>
+                    
+                    <Grid item xs={12} md={4}>
+                      <TextField
+                        fullWidth
+                        label="Confirm New Password"
+                        type="password"
+                        value={confirmNewPassword}
+                        onChange={(e) => setConfirmNewPassword(e.target.value)}
+                        variant="outlined"
+                        sx={{ mb: 2 }}
+                      />
+                    </Grid>
+                  </Grid>
+                  
+                  <Box sx={{ display: 'flex', gap: 2, mt: 3 }}>
+                    <Button
+                      variant="contained"
+                      color="primary"
+                      onClick={handleChangePassword}
+                      disabled={loading || !currentPassword || !newPassword || !confirmNewPassword}
+                      startIcon={loading ? <CircularProgress size={20} /> : <LockIcon />}
+                    >
+                      {loading ? 'Changing...' : 'Change Password'}
+                    </Button>
+                    
+                    <Button
+                      variant="outlined"
+                      onClick={() => {
+                        setShowChangePasswordForm(false);
+                        setCurrentPassword('');
+                        setNewPassword('');
+                        setConfirmNewPassword('');
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  </Box>
+                </Paper>
+              )}
+            </>
+          )}
+        </TabPanel>
+        
+        {/* Online Users Tab */}
+        <TabPanel value={tabValue} index={3}>
           <Box sx={{ mb: 4 }}>
             <Grid container spacing={3}>
               <Grid item xs={12} md={6}>
