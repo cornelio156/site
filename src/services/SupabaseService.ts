@@ -157,7 +157,14 @@ class SupabaseService {
 
   async createUser(userData: any): Promise<any> {
     await this.checkInitialized();
-    const { data, error } = await this.client!.from('users').insert(userData).select().single();
+    
+    // Generate a unique ID if not provided
+    const userWithId = {
+      id: userData.id || this.generateId(),
+      ...userData
+    };
+    
+    const { data, error } = await this.client!.from('users').insert(userWithId).select().single();
     
     if (error) {
       console.error('Erro ao criar usuário:', error);
@@ -165,6 +172,11 @@ class SupabaseService {
     }
     
     return data;
+  }
+
+  // Generate a unique ID
+  private generateId(): string {
+    return 'user_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
   }
 
   // Métodos para sessões
