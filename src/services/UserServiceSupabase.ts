@@ -232,10 +232,13 @@ export class UserServiceSupabase {
     password: string;
   }): Promise<User | null> {
     try {
+      // Hash the password before saving
+      const hashedPassword = await this.hashPassword(userData.password);
+      
       const newUser = await this.supabase.createUser({
         email: userData.email,
         name: userData.name,
-        password: userData.password,
+        password: hashedPassword,
         created_at: new Date().toISOString()
       });
 
@@ -267,10 +270,20 @@ export class UserServiceSupabase {
   static async updateUser(userId: string, updates: {
     name?: string;
     email?: string;
+    password?: string;
   }): Promise<User | null> {
     try {
       const client = this.supabase.getClient();
-      const { data, error } = await client.from('users').update(updates).eq('id', userId).select().single();
+      
+      // Prepare update data
+      const updateData: any = { ...updates };
+      
+      // Hash password if provided
+      if (updates.password) {
+        updateData.password = await this.hashPassword(updates.password);
+      }
+      
+      const { data, error } = await client.from('users').update(updateData).eq('id', userId).select().single();
       
       if (error) {
         console.error('Error updating user:', error);
@@ -295,7 +308,11 @@ export class UserServiceSupabase {
   static async changePassword(userId: string, newPassword: string): Promise<boolean> {
     try {
       const client = this.supabase.getClient();
-      const { error } = await client.from('users').update({ password: newPassword }).eq('id', userId);
+      
+      // Hash the new password before saving
+      const hashedPassword = await this.hashPassword(newPassword);
+      
+      const { error } = await client.from('users').update({ password: hashedPassword }).eq('id', userId);
       
       if (error) {
         console.error('Error changing password:', error);

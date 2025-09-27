@@ -510,8 +510,22 @@ const Admin: FC = () => {
 
       if (editingAdmin) {
         // Update existing admin
-        const success = await UserServiceSupabase.updateUser(editingAdmin, adminData);
+        const updateData = {
+          name: adminName,
+          email: adminEmail
+        };
+        
+        const success = await UserServiceSupabase.updateUser(editingAdmin, updateData);
         if (success) {
+          // If password is provided, update it separately
+          if (adminPassword) {
+            const passwordSuccess = await UserServiceSupabase.changePassword(editingAdmin, adminPassword);
+            if (!passwordSuccess) {
+              showFeedback('Admin updated but password change failed', 'warning');
+              return;
+            }
+          }
+          
           showFeedback('Admin updated successfully!', 'success');
           fetchAdminUsers();
           setShowAdminForm(false);

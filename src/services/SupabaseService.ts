@@ -227,6 +227,18 @@ class SupabaseService {
     }
   }
 
+  async deleteUser(id: string): Promise<boolean> {
+    await this.checkInitialized();
+    const { error } = await this.client!.from('users').delete().eq('id', id);
+    
+    if (error) {
+      console.error('Erro ao deletar usuário:', error);
+      return false;
+    }
+    
+    return true;
+  }
+
   // Métodos para configuração do site
   async getSiteConfig(): Promise<any | null> {
     await this.checkInitialized();
