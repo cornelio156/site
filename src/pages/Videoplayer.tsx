@@ -625,47 +625,88 @@ ${video.description || 'No description available'}
     
     console.log('Stripe payment check:', { paymentSuccess, sessionId, video: !!video, videoTitle: video?.title });
     
-    if (paymentSuccess === 'true' && video) {
-      console.log('Stripe payment successful, processing notification...');
+    // Process payment success even if video is not loaded yet
+    if (paymentSuccess === 'true') {
+      console.log('Stripe payment successful detected, processing...');
       
-      // Update state to show purchase was successful
-      setHasPurchased(true);
-      setPurchaseComplete(true);
-      setShowPurchaseModal(true);
-      
-      // Store the purchase in session storage
-      sessionStorage.setItem(`purchased_${video.$id}`, 'true');
-      
-      // Set a random product name if not already set
-      if (!purchasedProductName) {
-        setPurchasedProductName(getRandomProductName());
-      }
-      
-      // Send Telegram notification for Stripe payment (same as PayPal)
-      if (sessionId) {
-        console.log('Sending Stripe notification to Telegram with sessionId:', sessionId);
-        TelegramService.sendSaleNotification({
-          videoTitle: video.title,
-          videoPrice: video.price,
-          buyerEmail: undefined, // Stripe doesn't provide email in success URL
-          buyerName: undefined, // Stripe doesn't provide name in success URL
-          transactionId: sessionId,
-          paymentMethod: 'stripe',
-          timestamp: new Date().toLocaleString('pt-BR'),
-          videoUrl: `${window.location.origin}/video/${video.$id}`
-        }).then(success => {
-          console.log('Stripe notification result:', success);
-        }).catch(error => {
-          console.error('Failed to send Stripe notification to Telegram:', error);
-        });
+      // If video is loaded, process immediately
+      if (video) {
+        console.log('Video loaded, processing payment success immediately');
+        processStripePaymentSuccess(video, sessionId);
       } else {
-        console.warn('No sessionId found for Stripe payment notification');
+        console.log('Video not loaded yet, storing payment success for later processing');
+        // Store payment success info for when video loads
+        sessionStorage.setItem(`stripe_payment_success_${id}`, JSON.stringify({
+          sessionId,
+          timestamp: Date.now()
+        }));
       }
       
-      // Clear query params
+      // Clear query params immediately to prevent re-processing
       window.history.replaceState({}, document.title, `/video/${id}`);
     }
-  }, [id, video, purchasedProductName]);
+  }, [id, video]);
+
+  // Process Stripe payment success
+  const processStripePaymentSuccess = (videoData: Video, sessionId: string | null) => {
+    console.log('Processing Stripe payment success for video:', videoData.title);
+    
+    // Update state to show purchase was successful
+    setHasPurchased(true);
+    setPurchaseComplete(true);
+    setShowPurchaseModal(true);
+    
+    // Store the purchase in session storage
+    sessionStorage.setItem(`purchased_${videoData.$id}`, 'true');
+    
+    // Set a random product name if not already set
+    if (!purchasedProductName) {
+      setPurchasedProductName(getRandomProductName());
+    }
+    
+    // Send Telegram notification for Stripe payment
+    if (sessionId) {
+      console.log('Sending Stripe notification to Telegram with sessionId:', sessionId);
+      TelegramService.sendSaleNotification({
+        videoTitle: videoData.title,
+        videoPrice: videoData.price,
+        buyerEmail: undefined, // Stripe doesn't provide email in success URL
+        buyerName: undefined, // Stripe doesn't provide name in success URL
+        transactionId: sessionId,
+        paymentMethod: 'stripe',
+        timestamp: new Date().toLocaleString('pt-BR'),
+        videoUrl: `${window.location.origin}/video/${videoData.$id}`
+      }).then(success => {
+        console.log('Stripe notification result:', success);
+      }).catch(error => {
+        console.error('Failed to send Stripe notification to Telegram:', error);
+      });
+    } else {
+      console.warn('No sessionId found for Stripe payment notification');
+    }
+  };
+
+  // Check for stored Stripe payment success when video loads
+  useEffect(() => {
+    if (video && id) {
+      const storedPayment = sessionStorage.getItem(`stripe_payment_success_${id}`);
+      if (storedPayment) {
+        try {
+          const paymentData = JSON.parse(storedPayment);
+          console.log('Found stored Stripe payment success, processing now:', paymentData);
+          
+          // Process the stored payment success
+          processStripePaymentSuccess(video, paymentData.sessionId);
+          
+          // Clear the stored payment data
+          sessionStorage.removeItem(`stripe_payment_success_${id}`);
+        } catch (error) {
+          console.error('Error processing stored Stripe payment:', error);
+          sessionStorage.removeItem(`stripe_payment_success_${id}`);
+        }
+      }
+    }
+  }, [video, id]);
 
   if (loading) {
     return (
