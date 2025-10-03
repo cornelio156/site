@@ -301,14 +301,14 @@ const Home: FC = () => {
     if (telegramUsername) {
       // Create special offer message for Telegram
       const specialOfferMessage = `
-🎉 *SPECIAL OFFER - ALL CONTENT FOR $75* 🎉
+🎉 *SPECIAL OFFER - ALL CONTENT FOR $95* 🎉
 
 Hi! I'm interested in your special offer:
 
 💰 *What I want:*
 • Access to ALL premium content
 • Complete video collection
-• Special price: $75 (instead of individual purchases)
+• Special price: $95 (instead of individual purchases)
 
 💳 *Payment Methods Available:*
 • PayPal
@@ -318,7 +318,7 @@ Hi! I'm interested in your special offer:
 ❓ *Questions:*
 • How do I pay?
 • When do I get access?
-• What's included in the $75 package?
+• What's included in the $95 package?
 
 Please let me know how to proceed with this special offer!
 
@@ -388,7 +388,7 @@ Thanks! 🙏
             🎉 SPECIAL OFFER 🎉
           </Typography>
           <Typography variant="h4" sx={{ fontWeight: 'bold', mb: 2, position: 'relative', zIndex: 1 }}>
-            ALL CONTENT FOR ONLY $75
+            ALL CONTENT FOR ONLY $95
           </Typography>
           <Typography variant="h6" sx={{ mb: 3, position: 'relative', zIndex: 1, opacity: 0.9 }}>
             Get access to our entire premium collection at an unbeatable price!
@@ -419,7 +419,7 @@ Thanks! 🙏
                 boxShadow: '0 6px 20px rgba(0, 136, 204, 0.4)',
               }}
             >
-              Come to Telegram to Pay
+              Come to Telegram to Pay 
             </Button>
           )}
         </Box>
@@ -472,7 +472,7 @@ Thanks! 🙏
                   }}
                 />
                 <Chip 
-                  label="🔥 1,247+ Happy Customers"
+                  label="🔥 927+ Happy Customers"
                   size="small"
                   sx={{ 
                     backgroundColor: 'rgba(76, 175, 80, 0.1)',
@@ -482,7 +482,7 @@ Thanks! 🙏
                   }}
                 />
                 <Chip 
-                  label="⭐ 4.9/5 Rating"
+                  label="⭐ 4.4/5 Rating"
                   size="small"
                   sx={{ 
                     backgroundColor: 'rgba(255, 193, 7, 0.1)',
