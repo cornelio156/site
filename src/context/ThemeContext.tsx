@@ -11,7 +11,7 @@ interface ThemeContextType {
 }
 
 export const ThemeContext = createContext<ThemeContextType>({
-  mode: 'dark',
+  mode: 'light',
   toggleTheme: () => {},
 });
 
@@ -20,8 +20,8 @@ interface ThemeProviderProps {
 }
 
 export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
-  // Always start with dark theme for adult content site
-  const [mode, setMode] = useState<ThemeMode>('dark');
+  // Start with light theme by default
+  const [mode, setMode] = useState<ThemeMode>('light');
 
   useEffect(() => {
     // Check if user has a saved theme preference
@@ -29,8 +29,8 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     if (savedTheme) {
       setMode(savedTheme);
     } else {
-      // Set dark theme as default
-      localStorage.setItem('theme', 'dark');
+      // Set light theme as default
+      localStorage.setItem('theme', 'light');
     }
   }, []);
 

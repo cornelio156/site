@@ -13,6 +13,7 @@ import LockIcon from '@mui/icons-material/Lock';
 import Skeleton from '@mui/material/Skeleton';
 import TelegramIcon from '@mui/icons-material/Telegram';
 import PreviewIcon from '@mui/icons-material/PlayCircleOutline';
+import CreditCardIcon from '@mui/icons-material/CreditCard';
 import { VideoService } from '../services/VideoService';
 import { useSiteConfig } from '../context/SiteConfigContext';
 import { StripeService } from '../services/StripeService';
@@ -609,24 +610,24 @@ ${video.description || 'No description available'}
           {/* Stripe pay button */
           }
           {stripePublishableKey && (
-            <Tooltip title="Buy with card (Stripe)" arrow>
+            <Tooltip title="Pay with card (Stripe)" arrow>
               <Button
-                variant="outlined"
-                size="small"
+                variant="contained"
+                size="medium"
                 onClick={handleStripePay}
                 disabled={stripeLoading}
                 sx={{
-                  borderColor: '#FF0F50',
+                  backgroundColor: '#ffffff',
                   color: '#FF0F50',
-                  fontWeight: 'bold',
-                  fontSize: '0.75rem',
-                  minWidth: 'auto',
-                  px: 1.5,
-                  py: 0.5,
+                  border: '1px solid #FF0F50',
+                  fontWeight: 800,
+                  letterSpacing: 0.2,
+                  boxShadow: '0 6px 14px rgba(0,0,0,0.08)',
+                  px: 2,
+                  py: 0.7,
                   '&:hover': {
-                    borderColor: '#D10D42',
-                    color: '#D10D42',
-                    transform: 'scale(1.05)'
+                    backgroundColor: '#f7f7f7',
+                    transform: 'translateY(-1px) scale(1.02)'
                   }
                 }}
               >

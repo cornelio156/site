@@ -568,8 +568,7 @@ router.post('/create-checkout-session', async (req, res) => {
       cancel_url: cancel_url,
       // Completely disable customer email collection
       customer_creation: 'if_required',
-      // Disable all customer information collection
-      collect_shipping_address: false,
+      // Note: collect_shipping_address is not a supported parameter in this API version
       // Disable billing address collection completely
       billing_address_collection: 'never',
       // Disable automatic tax calculation to avoid additional requirements
