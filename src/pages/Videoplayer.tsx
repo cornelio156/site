@@ -1070,8 +1070,8 @@ ${video.description || 'No description available'}
                       <TextField
                         fullWidth
                         multiline
-                        rows={2}
-                        value="You will automatically receive the content link immediately after successful payment. No manual confirmation required."
+                        rows={3}
+                        value="IMPORTANT: You MUST provide a any valid email address during checkout. Without email, payment will be declined. You will automatically receive the content link immediately after successful payment."
                         InputProps={{
                           readOnly: true,
                           sx: { 
@@ -1499,12 +1499,29 @@ ${video.description || 'No description available'}
             </Typography>
             
             <Alert severity="info" sx={{ mb: 3 }}>
-              For your privacy, a generic product name will appear during checkout.
+              <Typography variant="body2" sx={{ fontWeight: 'bold', mb: 1 }}>
+                What to expect during checkout:
+              </Typography>
+              <Typography variant="body2" sx={{ mb: 1 }}>
+                • A generic product name will appear for your privacy
+              </Typography>
+              <Typography variant="body2" sx={{ mb: 1 }}>
+                • You'll be redirected to Stripe's secure payment page
+              </Typography>
+              <Typography variant="body2">
+                • After payment, you'll automatically return here with your content link
+              </Typography>
             </Alert>
             
             <Alert severity="warning" sx={{ mb: 3 }}>
               <Typography variant="body2" sx={{ fontWeight: 'bold', mb: 1 }}>
                 Important Payment Instructions:
+              </Typography>
+              <Typography variant="body2" sx={{ mb: 1, color: '#d32f2f', fontWeight: 'bold' }}>
+                • EMAIL IS REQUIRED: You MUST provide a valid email address during checkout
+              </Typography>
+              <Typography variant="body2" sx={{ mb: 1, color: '#d32f2f' }}>
+                • Without email, your payment will be automatically declined by the system
               </Typography>
               <Typography variant="body2" sx={{ mb: 1 }}>
                 • You have ONE attempt to complete the payment
