@@ -126,20 +126,31 @@ export default async function handler(req, res) {
       mode: 'payment',
       success_url,
       cancel_url,
-      // Try to make email optional when possible
-      customer_email_optional: true,
-      // Allow payments without requiring customer information
+      // Completely disable customer email collection
+      customer_creation: 'if_required',
+      // Disable all customer information collection
+      collect_shipping_address: false,
+      // Disable billing address collection completely
+      billing_address_collection: 'never',
+      // Disable automatic tax calculation to avoid additional requirements
+      automatic_tax: { enabled: false },
+      // Allow guest checkout without any customer info
+      allow_promotion_codes: false,
+      // Disable customer email completely
+      customer_email: null,
+      // Use guest checkout mode
       payment_method_options: {
         card: {
           setup_future_usage: 'off_session',
         },
       },
-      // Disable automatic tax calculation to avoid additional requirements
-      automatic_tax: { enabled: false },
-      // Allow guest checkout
-      allow_promotion_codes: false,
-      // Disable billing address collection to reduce friction
-      billing_address_collection: 'auto',
+      // Additional settings to minimize required fields
+      submit_type: 'pay',
+      // Disable customer portal
+      customer_update: {
+        address: 'never',
+        name: 'never',
+      },
     });
 
     res.status(200).json({ sessionId: session.id });

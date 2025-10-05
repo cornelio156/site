@@ -59,8 +59,8 @@ const Header: FC = () => {
     <AppBar 
       position="sticky"
       sx={{
-        bgcolor: mode === 'dark' ? '#0A0A0A' : '#121212',
-        color: '#fff',
+        bgcolor: mode === 'dark' ? '#0A0A0A' : '#ffffff',
+        color: mode === 'dark' ? '#fff' : '#000',
         boxShadow: '0 4px 12px rgba(0,0,0,0.5)'
       }}
     >
@@ -135,50 +135,56 @@ const Header: FC = () => {
             sx={{ 
               display: 'flex', 
               alignItems: 'center',
-              mx: 1,
-              minWidth: '200px',
-              maxWidth: '250px'
+              mx: 2,
+              minWidth: '280px',
+              maxWidth: '350px',
+              position: 'relative'
             }}
           >
             <TextField
-              placeholder="Search..."
+              placeholder="Search videos..."
               size="small"
               value={searchQuery}
               onChange={handleSearchChange}
               sx={{ 
                 flexGrow: 1,
                 '& .MuiOutlinedInput-root': {
-                  backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                  backgroundColor: 'rgba(255, 255, 255, 0.12)',
                   color: '#fff',
-                  height: '36px',
-                  fontSize: '0.85rem',
+                  height: '42px',
+                  fontSize: '0.9rem',
+                  borderRadius: '25px',
+                  backdropFilter: 'blur(10px)',
                   '& fieldset': {
-                    borderColor: 'rgba(255, 255, 255, 0.2)',
-                    borderWidth: '1px',
+                    borderColor: 'rgba(255, 15, 80, 0.3)',
+                    borderWidth: '2px',
                   },
                   '&:hover fieldset': {
-                    borderColor: 'rgba(255, 15, 80, 0.4)',
+                    borderColor: 'rgba(255, 15, 80, 0.6)',
+                    backgroundColor: 'rgba(255, 255, 255, 0.15)',
                   },
                   '&.Mui-focused fieldset': {
                     borderColor: '#FF0F50',
-                    borderWidth: '1px',
+                    borderWidth: '2px',
+                    backgroundColor: 'rgba(255, 255, 255, 0.18)',
                   },
                 },
                 '& .MuiInputBase-input': {
-                  padding: '8px 12px',
+                  padding: '10px 16px',
                   '&::placeholder': {
-                    color: 'rgba(255, 255, 255, 0.6)',
+                    color: 'rgba(255, 255, 255, 0.7)',
                     opacity: 1,
-                    fontSize: '0.85rem',
+                    fontSize: '0.9rem',
+                    fontWeight: 500,
                   },
                 },
               }}
               InputProps={{
                 startAdornment: (
-                  <InputAdornment position="start" sx={{ ml: 1 }}>
+                  <InputAdornment position="start" sx={{ ml: 1.5 }}>
                     <SearchIcon sx={{ 
-                      color: 'rgba(255, 255, 255, 0.6)', 
-                      fontSize: '18px' 
+                      color: 'rgba(255, 15, 80, 0.8)', 
+                      fontSize: '20px' 
                     }} />
                   </InputAdornment>
                 ),
@@ -189,37 +195,37 @@ const Header: FC = () => {
 
         {/* Navigation */}
         <Box sx={{ display: 'flex', alignItems: 'center' }}>
-          <Button 
-            color="inherit" 
-            component={RouterLink} 
-            to="/"
-            sx={{ 
-              mr: 1,
-              color: '#fff',
-              fontWeight: 600,
-              '&:hover': {
-                bgcolor: 'rgba(255, 15, 80, 0.1)'
-              }
-            }}
-          >
-            Home
-          </Button>
-          
-          <Button 
-            color="inherit" 
-            component={RouterLink} 
-            to="/videos"
-            sx={{ 
-              mr: 1,
-              color: '#fff',
-              fontWeight: 600,
-              '&:hover': {
-                bgcolor: 'rgba(255, 15, 80, 0.1)'
-              }
-            }}
-          >
-            Videos
-          </Button>
+            <Button 
+              color="inherit" 
+              component={RouterLink} 
+              to="/"
+              sx={{ 
+                mr: 1,
+                color: mode === 'dark' ? '#fff' : '#000',
+                fontWeight: 600,
+                '&:hover': {
+                  bgcolor: 'rgba(255, 15, 80, 0.1)'
+                }
+              }}
+            >
+              Home
+            </Button>
+            
+            <Button 
+              color="inherit" 
+              component={RouterLink} 
+              to="/videos"
+              sx={{ 
+                mr: 1,
+                color: mode === 'dark' ? '#fff' : '#000',
+                fontWeight: 600,
+                '&:hover': {
+                  bgcolor: 'rgba(255, 15, 80, 0.1)'
+                }
+              }}
+            >
+              Videos
+            </Button>
           
           {/* Mobile Search Icon */}
           {isMobile && (
@@ -249,7 +255,7 @@ const Header: FC = () => {
                 startIcon={<PersonIcon />}
                 sx={{ 
                   mr: 1,
-                  color: '#fff',
+                  color: mode === 'dark' ? '#fff' : '#000',
                   fontWeight: 600,
                   '&:hover': {
                     bgcolor: 'rgba(255, 15, 80, 0.1)'
@@ -263,7 +269,7 @@ const Header: FC = () => {
                 color="inherit" 
                 onClick={handleLogout}
                 sx={{ 
-                  color: '#fff',
+                  color: mode === 'dark' ? '#fff' : '#000',
                   '&:hover': {
                     bgcolor: 'rgba(255, 15, 80, 0.1)'
                   } 
@@ -281,7 +287,7 @@ const Header: FC = () => {
             onClick={toggleTheme} 
             sx={{ 
               ml: 1,
-              color: '#FF69B4',
+              color: mode === 'dark' ? '#FF69B4' : '#FF0F50',
               '&:hover': {
                 bgcolor: 'rgba(255, 15, 80, 0.1)'
               }

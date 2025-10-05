@@ -365,14 +365,16 @@ Thanks! 🙏
         {/* Special Offer Section */}
         <Box sx={{ 
           mb: 6,
-          py: 4,
-          px: 3,
-          background: 'linear-gradient(135deg, #FF0F50 0%, #D10D42 100%)',
-          borderRadius: 2,
+          py: 5,
+          px: 4,
+          background: 'linear-gradient(135deg, #FF0F50 0%, #D10D42 50%, #8B0000 100%)',
+          borderRadius: 3,
           color: 'white',
           textAlign: 'center',
           position: 'relative',
           overflow: 'hidden',
+          boxShadow: '0 20px 40px rgba(255, 15, 80, 0.3)',
+          border: '2px solid rgba(255, 255, 255, 0.1)',
           '&::before': {
             content: '""',
             position: 'absolute',
@@ -380,18 +382,62 @@ Thanks! 🙏
             left: 0,
             right: 0,
             bottom: 0,
-            background: 'linear-gradient(45deg, transparent 30%, rgba(255,255,255,0.1) 50%, transparent 70%)',
+            background: 'linear-gradient(45deg, transparent 30%, rgba(255,255,255,0.15) 50%, transparent 70%)',
             animation: 'shimmer 3s infinite'
+          },
+          '&::after': {
+            content: '""',
+            position: 'absolute',
+            top: -50,
+            right: -50,
+            width: 100,
+            height: 100,
+            borderRadius: '50%',
+            background: 'rgba(255, 255, 255, 0.1)',
+            animation: 'pulse 4s ease-in-out infinite'
           }
         }}>
-          <Typography variant="h3" sx={{ fontWeight: 'bold', mb: 2, position: 'relative', zIndex: 1 }}>
+          <Typography variant="h3" sx={{ 
+            fontWeight: 'bold', 
+            mb: 2, 
+            position: 'relative', 
+            zIndex: 1,
+            textShadow: '0 4px 8px rgba(0,0,0,0.3)',
+            fontSize: { xs: '1.8rem', md: '2.5rem' }
+          }}>
             🎉 SPECIAL OFFER 🎉
           </Typography>
-          <Typography variant="h4" sx={{ fontWeight: 'bold', mb: 2, position: 'relative', zIndex: 1 }}>
+          <Typography variant="h4" sx={{ 
+            fontWeight: 'bold', 
+            mb: 2, 
+            position: 'relative', 
+            zIndex: 1,
+            textShadow: '0 3px 6px rgba(0,0,0,0.3)',
+            fontSize: { xs: '1.5rem', md: '2rem' }
+          }}>
             ALL CONTENT FOR ONLY $95
           </Typography>
-          <Typography variant="h6" sx={{ mb: 3, position: 'relative', zIndex: 1, opacity: 0.9 }}>
+          <Typography variant="h6" sx={{ 
+            mb: 2, 
+            position: 'relative', 
+            zIndex: 1, 
+            opacity: 0.95,
+            fontSize: { xs: '1rem', md: '1.2rem' },
+            fontWeight: 500
+          }}>
             Get access to our entire premium collection at an unbeatable price!
+          </Typography>
+          <Typography variant="h5" sx={{ 
+            mb: 3, 
+            position: 'relative', 
+            zIndex: 1, 
+            fontWeight: 'bold', 
+            color: '#FFEB3B',
+            textShadow: '0 2px 4px rgba(0,0,0,0.5)',
+            fontSize: { xs: '1.1rem', md: '1.4rem' },
+            animation: 'pulse 2s ease-in-out infinite'
+          }}>
+            📦 EVERYTHING YOU SEE ON THIS SITE INCLUDED! 📦
           </Typography>
           
           {/* Telegram Button */}
@@ -404,22 +450,25 @@ Thanks! 🙏
                 backgroundColor: '#0088cc',
                 color: 'white',
                 fontWeight: 'bold',
-                px: 4,
-                py: 2,
-                borderRadius: '25px',
+                px: 5,
+                py: 2.5,
+                borderRadius: '30px',
                 textTransform: 'none',
-                fontSize: '1.1rem',
+                fontSize: { xs: '1rem', md: '1.2rem' },
                 position: 'relative',
                 zIndex: 1,
                 '&:hover': {
                   backgroundColor: '#006699',
-                  transform: 'scale(1.05)',
+                  transform: 'scale(1.08) translateY(-2px)',
+                  boxShadow: '0 12px 30px rgba(0, 136, 204, 0.6)',
                 },
                 transition: 'all 0.3s ease',
-                boxShadow: '0 6px 20px rgba(0, 136, 204, 0.4)',
+                boxShadow: '0 8px 25px rgba(0, 136, 204, 0.5)',
+                border: '2px solid rgba(255, 255, 255, 0.2)',
+                backdropFilter: 'blur(10px)',
               }}
             >
-              Come to Telegram to Pay 
+              🚀 Come to Telegram to Pay 
             </Button>
           )}
         </Box>

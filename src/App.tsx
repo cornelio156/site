@@ -22,6 +22,7 @@ import PrivacyNotice from './components/PrivacyNotice';
 import ScrollToTop from './components/ScrollToTop';
 import CustomAnalytics from './components/CustomAnalytics';
 import LoadingModal from './components/LoadingModal';
+import PaymentSuccessToast from './components/PaymentSuccessToast';
 
 // Componente AppContent para usar hooks que dependem do Router
 const AppContent: FC = () => {
@@ -99,6 +100,7 @@ const AppContent: FC = () => {
       {enableSplash && showSplash && <SplashAnimation onAnimationComplete={handleAnimationComplete} />}
       <PrivacyNotice />
       <PaymentNotifications />
+      <PaymentSuccessToast />
       <CustomAnalytics />
       <Header />
       <Box component="main" sx={{ flexGrow: 1 }}>

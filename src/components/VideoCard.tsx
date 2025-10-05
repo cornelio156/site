@@ -1,4 +1,4 @@
-import { FC, useState, useEffect } from 'react';
+import { FC, useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
@@ -15,6 +15,7 @@ import TelegramIcon from '@mui/icons-material/Telegram';
 import PreviewIcon from '@mui/icons-material/PlayCircleOutline';
 import { VideoService } from '../services/VideoService';
 import { useSiteConfig } from '../context/SiteConfigContext';
+import { StripeService } from '../services/StripeService';
 import ThumbnailFallback from './ThumbnailFallback';
 
 interface VideoCardProps {
@@ -29,15 +30,42 @@ interface VideoCardProps {
     views?: number;
     createdAt?: string;
     created_at?: string;
+    product_link?: string;
   };
 }
 
 const VideoCard: FC<VideoCardProps> = ({ video }) => {
   const navigate = useNavigate();
-  const { telegramUsername } = useSiteConfig();
+  const { telegramUsername, stripePublishableKey } = useSiteConfig();
   const [isHovered, setIsHovered] = useState(false);
   const [isThumbnailLoading, setIsThumbnailLoading] = useState(true);
   const [thumbnailError, setThumbnailError] = useState(false);
+  const [isVideoLoading, setIsVideoLoading] = useState(false);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [isPlayingInline, setIsPlayingInline] = useState(false);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  // Ensure only one card plays at a time
+  useEffect(() => {
+    const onAnyCardPlay = (e: Event) => {
+      try {
+        const custom = e as CustomEvent<{ id: string }>;
+        if (custom.detail && custom.detail.id !== video.$id) {
+          // Stop this card if another started
+          if (videoRef.current) {
+            try { videoRef.current.pause(); } catch {}
+          }
+          setIsPlayingInline(false);
+          setVideoUrl(null);
+        }
+      } catch {
+        // ignore
+      }
+    };
+    window.addEventListener('videocard-play', onAnyCardPlay as EventListener);
+    return () => window.removeEventListener('videocard-play', onAnyCardPlay as EventListener);
+  }, [video.$id]);
+  const [stripeLoading, setStripeLoading] = useState(false);
   
   const handleCardClick = async () => {
     try {
@@ -57,6 +85,57 @@ const VideoCard: FC<VideoCardProps> = ({ video }) => {
     e.stopPropagation(); // Prevent card click
     // Navigate to video page for preview
     navigate(`/video/${video.$id}`);
+  };
+
+  const openInlinePlayer = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      // Notify other cards to stop
+      window.dispatchEvent(new CustomEvent('videocard-play', { detail: { id: video.$id } }));
+      setIsVideoLoading(true);
+      const url = await VideoService.getVideoFileUrl(video.$id);
+      setVideoUrl(url);
+      setIsPlayingInline(true);
+    } catch (err) {
+      console.error('Failed to load video URL for inline play', err);
+    } finally {
+      setIsVideoLoading(false);
+    }
+  };
+
+  const stopInlinePlayer = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (videoRef.current) {
+      try { videoRef.current.pause(); } catch {}
+    }
+    setIsPlayingInline(false);
+    setVideoUrl(null);
+  };
+
+  const handleStripePay = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!stripePublishableKey) {
+      console.warn('Stripe key not configured');
+      return;
+    }
+    try {
+      setStripeLoading(true);
+      await StripeService.initStripe(stripePublishableKey);
+      const successUrl = `${window.location.origin}/#/video/${video.$id}?payment_success=true&session_id={CHECKOUT_SESSION_ID}`;
+      const cancelUrl = `${window.location.origin}/#/videos?payment_canceled=true`;
+      const sessionId = await StripeService.createCheckoutSession(
+        video.price,
+        'usd',
+        'Premium Content',
+        successUrl,
+        cancelUrl
+      );
+      await StripeService.redirectToCheckout(sessionId);
+    } catch (err) {
+      console.error('Stripe checkout failed', err);
+    } finally {
+      setStripeLoading(false);
+    }
   };
 
   const handleTelegramClick = (e: React.MouseEvent) => {
@@ -167,13 +246,17 @@ ${video.description || 'No description available'}
 
   return (
     <>
-      {/* Add CSS animation for pulse effect */}
+      {/* Add CSS animations */}
       <style>
         {`
           @keyframes pulse {
             0% { opacity: 1; }
             50% { opacity: 0.7; }
             100% { opacity: 1; }
+          }
+          @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
           }
         `}
       </style>
@@ -301,7 +384,7 @@ ${video.description || 'No description available'}
           }}
         />
         
-        {/* Hover overlay */}
+        {/* Hover overlay and inline playback area */}
         <Box
           sx={{
             position: 'absolute',
@@ -309,36 +392,43 @@ ${video.description || 'No description available'}
             left: 0,
             width: '100%',
             height: '100%',
-            background: 'linear-gradient(to top, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.3) 50%, rgba(0,0,0,0.3) 100%)',
+            background: isPlayingInline ? 'transparent' : 'linear-gradient(to top, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.3) 50%, rgba(0,0,0,0.3) 100%)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            opacity: isHovered ? 1 : 0.4,
+            opacity: isPlayingInline ? 1 : (isHovered ? 1 : 0.4),
             transition: 'all 0.3s ease',
           }}
         >
-          {/* Main play button */}
-          <Box
-            sx={{
-              width: '70px',
-              height: '70px',
-              borderRadius: '50%',
-              backgroundColor: 'rgba(255,15,80,0.7)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transform: isHovered ? 'scale(1.1)' : 'scale(0.9)',
-              transition: 'all 0.3s ease',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-            }}
-          >
-            {video.isPurchased ? (
+          {isPlayingInline && videoUrl ? (
+            <video
+              src={videoUrl}
+              controls
+              autoPlay
+              ref={videoRef}
+              onClick={(e) => e.stopPropagation()}
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            />
+          ) : (
+            <Box
+              onClick={openInlinePlayer}
+              sx={{
+                width: '70px',
+                height: '70px',
+                borderRadius: '50%',
+                backgroundColor: 'rgba(255,15,80,0.7)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transform: isHovered ? 'scale(1.1)' : 'scale(0.9)',
+                transition: 'all 0.3s ease',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+                cursor: 'pointer'
+              }}
+            >
               <PlayArrowIcon sx={{ fontSize: 45, color: 'white' }} />
-            ) : (
-              <LockIcon sx={{ fontSize: 35, color: 'white' }} />
-            )}
-          </Box>
-          
+            </Box>
+          )}
         </Box>
         
         {/* Duration badge */}
@@ -372,20 +462,23 @@ ${video.description || 'No description available'}
             top: 8, 
             right: 8, 
             fontWeight: 'bold',
-            fontSize: '0.9rem',
-            height: '32px',
-            boxShadow: '0 4px 12px rgba(255, 15, 80, 0.4)',
+            fontSize: '1rem',
+            height: '36px',
+            boxShadow: '0 6px 16px rgba(255, 15, 80, 0.5)',
             backgroundColor: '#FF0F50',
-            border: '2px solid rgba(255, 255, 255, 0.3)',
+            border: '3px solid rgba(255, 255, 255, 0.4)',
+            backdropFilter: 'blur(10px)',
             '& .MuiChip-label': {
               color: 'white',
               fontWeight: 'bold',
-              px: 1.5
+              px: 2,
+              textShadow: '0 1px 2px rgba(0,0,0,0.3)'
             },
             '&:hover': {
               backgroundColor: '#D10D42',
-              transform: 'scale(1.05)',
-              transition: 'all 0.2s ease'
+              transform: 'scale(1.08)',
+              boxShadow: '0 8px 20px rgba(255, 15, 80, 0.6)',
+              transition: 'all 0.3s ease'
             }
           }}
         />
@@ -403,13 +496,13 @@ ${video.description || 'No description available'}
           display: '-webkit-box',
           WebkitLineClamp: 2,
           WebkitBoxOrient: 'vertical',
-          color: theme => theme.palette.mode === 'dark' ? 'white' : 'text.primary',
+          color: theme => theme.palette.mode === 'dark' ? 'white' : 'black',
         }}>
           {video.title}
         </Typography>
         
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: theme => theme.palette.mode === 'dark' ? '#FF69B4' : 'text.secondary' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: theme => theme.palette.mode === 'dark' ? '#FF69B4' : '#FF0F50' }}>
             <VisibilityIcon sx={{ fontSize: 16 }} />
             <Typography variant="caption">
               {formatViews(video.views)}
@@ -428,19 +521,34 @@ ${video.description || 'No description available'}
           display: 'flex', 
           justifyContent: 'center', 
           alignItems: 'center',
-          mt: 1,
-          p: 1,
-          backgroundColor: 'rgba(255, 15, 80, 0.1)',
-          borderRadius: 1,
-          border: '1px solid rgba(255, 15, 80, 0.2)'
+          mt: 1.5,
+          p: 1.5,
+          background: 'linear-gradient(135deg, rgba(255, 15, 80, 0.15) 0%, rgba(209, 13, 66, 0.15) 100%)',
+          borderRadius: 2,
+          border: '2px solid rgba(255, 15, 80, 0.3)',
+          position: 'relative',
+          overflow: 'hidden',
+          '&::before': {
+            content: '""',
+            position: 'absolute',
+            top: 0,
+            left: '-100%',
+            width: '100%',
+            height: '100%',
+            background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent)',
+            animation: 'shimmer 3s infinite'
+          }
         }}>
           <Typography 
             variant="h6" 
             sx={{ 
               color: '#FF0F50',
               fontWeight: 'bold',
-              fontSize: '1.1rem',
-              textAlign: 'center'
+              fontSize: '1.3rem',
+              textAlign: 'center',
+              textShadow: '0 1px 2px rgba(0,0,0,0.1)',
+              position: 'relative',
+              zIndex: 1
             }}
           >
             ${video.price.toFixed(2)}
@@ -455,8 +563,26 @@ ${video.description || 'No description available'}
           mt: 1.5,
           px: 1
         }}>
-          {/* Preview button */}
-          <Tooltip title="Watch Preview" arrow>
+          {/* Play icon button (always visible) */}
+          <Tooltip title={'Play here'} arrow>
+            <IconButton
+              size="small"
+              onClick={openInlinePlayer}
+              sx={{
+                backgroundColor: 'rgba(255,15,80,0.12)',
+                color: '#FF0F50',
+                '&:hover': {
+                  backgroundColor: 'rgba(255,15,80,0.2)',
+                  transform: 'scale(1.05)'
+                }
+              }}
+            >
+              <PlayArrowIcon />
+            </IconButton>
+          </Tooltip>
+
+          {/* Details button */}
+          <Tooltip title="Details" arrow>
             <Button
               variant="contained"
               size="small"
@@ -476,9 +602,64 @@ ${video.description || 'No description available'}
                 },
               }}
             >
-              Preview
+              Details
             </Button>
           </Tooltip>
+
+          {/* Stripe pay button */
+          }
+          {stripePublishableKey && (
+            <Tooltip title="Buy with card (Stripe)" arrow>
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={handleStripePay}
+                disabled={stripeLoading}
+                sx={{
+                  borderColor: '#FF0F50',
+                  color: '#FF0F50',
+                  fontWeight: 'bold',
+                  fontSize: '0.75rem',
+                  minWidth: 'auto',
+                  px: 1.5,
+                  py: 0.5,
+                  '&:hover': {
+                    borderColor: '#D10D42',
+                    color: '#D10D42',
+                    transform: 'scale(1.05)'
+                  }
+                }}
+              >
+                {stripeLoading ? '...' : 'Pay'}
+              </Button>
+            </Tooltip>
+          )}
+
+          {/* Get content button (product link) visible when purchased and link exists */}
+          {video.isPurchased && video.product_link && (
+            <Tooltip title="Get content" arrow>
+              <Button
+                variant="contained"
+                size="small"
+                onClick={(e) => { e.stopPropagation(); window.open(video.product_link as string, '_blank'); }}
+                sx={{
+                  backgroundColor: 'rgba(33, 150, 243, 0.9)',
+                  color: 'white',
+                  fontWeight: 'bold',
+                  fontSize: '0.75rem',
+                  minWidth: 'auto',
+                  px: 1.5,
+                  py: 0.5,
+                  '&:hover': {
+                    backgroundColor: 'rgba(33, 150, 243, 1)',
+                    transform: 'scale(1.05)'
+                  }
+                }}
+              >
+                Get Content
+              </Button>
+            </Tooltip>
+          )}
 
           {/* Telegram button */}
           {telegramUsername && (
@@ -504,6 +685,8 @@ ${video.description || 'No description available'}
         </Box>
       </CardContent>
       </Card>
+      
+      {/* Inline playback handled within thumbnail overlay; no modal */}
     </>
   );
 };

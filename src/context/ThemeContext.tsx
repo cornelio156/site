@@ -57,16 +57,17 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
         main: '#9900CC', // Purple accent
       },
       background: {
-        default: mode === 'dark' ? '#0A0A0A' : '#f5f5f5', // Deeper black background
-        paper: mode === 'dark' ? '#121212' : '#ffffff',   // Darker cards
+        default: mode === 'dark' ? '#0A0A0A' : '#ffffff', // White background for light mode
+        paper: mode === 'dark' ? '#121212' : '#ffffff',   // White cards for light mode
       },
       text: {
-        primary: mode === 'dark' ? '#FFFFFF' : '#000000',
-        secondary: mode === 'dark' ? '#FF69B4' : '#555555', // Hot pink for secondary text in dark mode
+        primary: mode === 'dark' ? '#FFFFFF' : '#000000', // Black text for light mode
+        secondary: mode === 'dark' ? '#FF69B4' : '#FF0F50', // Red for secondary text in light mode
       },
       error: {
         main: '#FF0000', // Pure red for errors
       },
+      divider: mode === 'dark' ? 'rgba(255, 15, 80, 0.2)' : 'rgba(255, 15, 80, 0.3)',
     },
     typography: {
       fontFamily: '"Montserrat", "Roboto", "Helvetica", "Arial", sans-serif',
@@ -143,6 +144,54 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     <ThemeContext.Provider value={{ mode, toggleTheme }}>
       <MuiThemeProvider theme={theme}>
         <CssBaseline />
+        <style>
+          {`
+            body {
+              background-color: ${mode === 'dark' ? '#0A0A0A' : '#ffffff'} !important;
+              color: ${mode === 'dark' ? '#FFFFFF' : '#000000'} !important;
+            }
+            
+            .light-theme {
+              background-color: #ffffff !important;
+              color: #000000 !important;
+            }
+            
+            .dark-theme {
+              background-color: #0A0A0A !important;
+              color: #FFFFFF !important;
+            }
+            
+            /* Light mode specific styles */
+            .light-theme .MuiPaper-root {
+              background-color: #ffffff !important;
+              color: #000000 !important;
+            }
+            
+            .light-theme .MuiCard-root {
+              background-color: #ffffff !important;
+              color: #000000 !important;
+            }
+            
+            .light-theme .MuiContainer-root {
+              background-color: #ffffff !important;
+            }
+            
+            /* Dark mode specific styles */
+            .dark-theme .MuiPaper-root {
+              background-color: #121212 !important;
+              color: #FFFFFF !important;
+            }
+            
+            .dark-theme .MuiCard-root {
+              background-color: #121212 !important;
+              color: #FFFFFF !important;
+            }
+            
+            .dark-theme .MuiContainer-root {
+              background-color: #0A0A0A !important;
+            }
+          `}
+        </style>
         {children}
       </MuiThemeProvider>
     </ThemeContext.Provider>

@@ -54,6 +54,31 @@ module.exports = async function(req, res) {
       mode: 'payment',
       success_url: success_url,
       cancel_url: cancel_url,
+      // Completely disable customer email collection
+      customer_creation: 'if_required',
+      // Disable all customer information collection
+      collect_shipping_address: false,
+      // Disable billing address collection completely
+      billing_address_collection: 'never',
+      // Disable automatic tax calculation to avoid additional requirements
+      automatic_tax: { enabled: false },
+      // Allow guest checkout without any customer info
+      allow_promotion_codes: false,
+      // Disable customer email completely
+      customer_email: null,
+      // Use guest checkout mode
+      payment_method_options: {
+        card: {
+          setup_future_usage: 'off_session',
+        },
+      },
+      // Additional settings to minimize required fields
+      submit_type: 'pay',
+      // Disable customer portal
+      customer_update: {
+        address: 'never',
+        name: 'never',
+      },
     });
 
     return res.json({

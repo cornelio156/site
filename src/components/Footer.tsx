@@ -63,16 +63,16 @@ const Footer: FC = () => {
       component="footer" 
       sx={{ 
         py: 5, 
-        bgcolor: theme.palette.mode === 'dark' ? '#0A0A0A' : '#121212',
-        borderTop: `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255,15,80,0.2)' : 'rgba(255,15,80,0.3)'}`,
-        color: '#fff',
+        bgcolor: theme.palette.mode === 'dark' ? '#0A0A0A' : '#ffffff',
+        borderTop: `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255,15,80,0.2)' : 'rgba(255,15,80,0.15)'}`,
+        color: theme.palette.mode === 'dark' ? '#fff' : '#111',
         mt: 6
       }}
     >
       {/* Age verification disclaimer */}
       <Box 
         sx={{ 
-          backgroundColor: 'rgba(255, 15, 80, 0.1)', 
+          backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 15, 80, 0.1)' : 'rgba(255, 15, 80, 0.07)', 
           p: 2, 
           mb: 4,
           borderRadius: 1,
@@ -83,7 +83,7 @@ const Footer: FC = () => {
         }}
       >
         <WarningIcon sx={{ color: '#FF0F50', mr: 2 }} />
-        <Typography variant="body2" sx={{ color: 'white' }}>
+        <Typography variant="body2" sx={{ color: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.85)' : '#333' }}>
           <strong>AGE VERIFICATION NOTICE:</strong> This website contains adult content and is intended for adults aged 18 years or older. 
           By entering this site, you confirm that you are at least 18 years old and agree to our terms and conditions.
         </Typography>
@@ -96,7 +96,7 @@ const Footer: FC = () => {
               <Typography variant="h6" sx={{ color: '#FF0F50', fontWeight: 'bold', mb: 2 }}>
                 {siteName}
               </Typography>
-              <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }}>
+              <Typography variant="body2" sx={{ color: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.7)' }}>
                 We offer exclusive premium adult content for our users. 
                 All videos are carefully selected to ensure 
                 the highest quality viewing experience for our 18+ audience.
@@ -114,7 +114,7 @@ const Footer: FC = () => {
                 underline="hover" 
                 sx={{ 
                   mb: 1.5, 
-                  color: 'rgba(255,255,255,0.7)',
+                  color: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.7)',
                   '&:hover': {
                     color: '#FF69B4'
                   }
@@ -127,7 +127,7 @@ const Footer: FC = () => {
                 underline="hover" 
                 sx={{ 
                   mb: 1.5, 
-                  color: 'rgba(255,255,255,0.7)',
+                  color: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.7)',
                   '&:hover': {
                     color: '#FF69B4'
                   }
@@ -139,9 +139,9 @@ const Footer: FC = () => {
                 sx={{ 
                   display: 'flex', 
                   alignItems: 'center',
-                  color: '#FF69B4',
+                  color: '#FF0F50',
                   mt: 1,
-                  background: 'rgba(255,15,80,0.1)',
+                  background: theme.palette.mode === 'dark' ? 'rgba(255,15,80,0.1)' : 'rgba(255,15,80,0.07)',
                   px: 1.5,
                   py: 0.5,
                   borderRadius: 1,
@@ -159,17 +159,17 @@ const Footer: FC = () => {
             <Typography variant="h6" sx={{ color: '#FF0F50', fontWeight: 'bold', mb: 2 }}>
               Legal Information
             </Typography>
-            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }} paragraph>
+            <Typography variant="body2" sx={{ color: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.7)' }} paragraph>
               This website contains adult-oriented material intended for individuals 18 years of age or older. 
               All models appearing on this website were 18 years of age or older at the time of production.
             </Typography>
-            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)' }} paragraph>
+            <Typography variant="body2" sx={{ color: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.55)' }} paragraph>
               USC 2257 Record-Keeping Requirements Compliance Statement
             </Typography>
           </Grid>
         </Grid>
         
-        <Divider sx={{ my: 4, borderColor: 'rgba(255,255,255,0.1)' }} />
+        <Divider sx={{ my: 4, borderColor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)' }} />
         
         <Box 
           sx={{ 
@@ -179,11 +179,11 @@ const Footer: FC = () => {
             justifyContent: 'space-between'
           }}
         >
-          <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)' }}>
+          <Typography variant="body2" sx={{ color: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.6)' }}>
             &copy; {currentYear} {siteName}. All rights reserved. Adults only.
           </Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', mt: { xs: 2, md: 0 } }}>
-            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)', mr: 2 }}>
+            <Typography variant="body2" sx={{ color: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.6)', mr: 2 }}>
               By accessing this site you agree that you are at least 18 years old
             </Typography>
             
