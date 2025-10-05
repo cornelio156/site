@@ -1,7 +1,7 @@
 /**
  * Appwrite serverless function for creating a Stripe checkout session
  */
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY, { apiVersion: '2022-11-15' });
 
 module.exports = async function(req, res) {
   // Parse request body
@@ -36,15 +36,15 @@ module.exports = async function(req, res) {
     // Select a random product name
     const randomProductName = productNames[Math.floor(Math.random() * productNames.length)];
     
-    // Create a Stripe checkout session
+    // Create a Stripe checkout session (simplified)
     const session = await stripe.checkout.sessions.create({
-      automatic_payment_methods: { enabled: true },
+      payment_method_types: ['card'],
       line_items: [
         {
           price_data: {
             currency: currency,
             product_data: {
-              name: randomProductName,  // Use random name instead of actual video name
+              name: randomProductName,
             },
             unit_amount: Math.round(amount),
           },
@@ -54,29 +54,6 @@ module.exports = async function(req, res) {
       mode: 'payment',
       success_url: success_url,
       cancel_url: cancel_url,
-      // Completely disable customer email collection
-      customer_creation: 'if_required',
-      // Note: collect_shipping_address is not a supported parameter in this API version
-      // Let Stripe decide when to collect billing address
-      billing_address_collection: 'auto',
-      // Disable automatic tax calculation to avoid additional requirements
-      automatic_tax: { enabled: false },
-      // Allow guest checkout without any customer info
-      allow_promotion_codes: false,
-      // Do not include customer_email when not available/valid
-      // Use guest checkout mode
-      payment_method_options: {
-        card: {
-          setup_future_usage: 'off_session',
-        },
-      },
-      // Additional settings to minimize required fields
-      submit_type: 'pay',
-      // Disable customer portal
-      customer_update: {
-        address: 'never',
-        name: 'never',
-      },
     });
 
     return res.json({

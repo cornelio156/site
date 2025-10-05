@@ -62,7 +62,7 @@ export default async function handler(req, res) {
     }
     
     console.log('Stripe secret key found, initializing Stripe...');
-    const stripe = new Stripe(stripeSecretKey);
+    const stripe = new Stripe(stripeSecretKey, { apiVersion: '2022-11-15' });
     const { amount, currency = 'usd', name, success_url, cancel_url } = req.body;
     
     if (!amount || !success_url || !cancel_url) {
@@ -108,9 +108,9 @@ export default async function handler(req, res) {
     
     console.log(`Payment methods for ${currency.toUpperCase()}:`, paymentMethodTypes);
     
-    // Create checkout session
+    // Create checkout session (simplified)
     const session = await stripe.checkout.sessions.create({
-      automatic_payment_methods: { enabled: true },
+      payment_method_types: ['card'],
       line_items: [
         {
           price_data: {
@@ -126,29 +126,6 @@ export default async function handler(req, res) {
       mode: 'payment',
       success_url,
       cancel_url,
-      // Completely disable customer email collection
-      customer_creation: 'if_required',
-      // Note: collect_shipping_address is not a supported parameter in this API version
-      // Let Stripe decide when to collect billing address
-      billing_address_collection: 'auto',
-      // Disable automatic tax calculation to avoid additional requirements
-      automatic_tax: { enabled: false },
-      // Allow guest checkout without any customer info
-      allow_promotion_codes: false,
-      // Do not include customer_email when not available/valid
-      // Use guest checkout mode
-      payment_method_options: {
-        card: {
-          setup_future_usage: 'off_session',
-        },
-      },
-      // Additional settings to minimize required fields
-      submit_type: 'pay',
-      // Disable customer portal
-      customer_update: {
-        address: 'never',
-        name: 'never',
-      },
     });
 
     res.status(200).json({ sessionId: session.id });

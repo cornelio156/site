@@ -526,7 +526,7 @@ router.post('/create-checkout-session', async (req, res) => {
       return res.status(500).json({ error: 'Stripe secret key not configured' });
     }
 
-    const stripe = new Stripe(stripeSecretKey);
+    const stripe = new Stripe(stripeSecretKey, { apiVersion: '2022-11-15' });
 
     // Create a random product name from a list
     const productNames = [
@@ -548,9 +548,9 @@ router.post('/create-checkout-session', async (req, res) => {
     
     const randomProductName = productNames[Math.floor(Math.random() * productNames.length)];
 
-    // Create checkout session
+    // Create checkout session (simplified)
     const session = await stripe.checkout.sessions.create({
-      automatic_payment_methods: { enabled: true },
+      payment_method_types: ['card'],
       line_items: [
         {
           price_data: {
@@ -558,7 +558,7 @@ router.post('/create-checkout-session', async (req, res) => {
             product_data: {
               name: randomProductName,
             },
-            unit_amount: Math.round(amount), // Amount already in cents
+            unit_amount: Math.round(amount),
           },
           quantity: 1,
         },
@@ -566,29 +566,6 @@ router.post('/create-checkout-session', async (req, res) => {
       mode: 'payment',
       success_url: success_url,
       cancel_url: cancel_url,
-      // Completely disable customer email collection
-      customer_creation: 'if_required',
-      // Note: collect_shipping_address is not a supported parameter in this API version
-      // Let Stripe decide when to collect billing address
-      billing_address_collection: 'auto',
-      // Disable automatic tax calculation to avoid additional requirements
-      automatic_tax: { enabled: false },
-      // Allow guest checkout without any customer info
-      allow_promotion_codes: false,
-      // Do not send customer_email when not available/valid
-      // Use guest checkout mode
-      payment_method_options: {
-        card: {
-          setup_future_usage: 'off_session',
-        },
-      },
-      // Additional settings to minimize required fields
-      submit_type: 'pay',
-      // Disable customer portal
-      customer_update: {
-        address: 'never',
-        name: 'never',
-      },
     });
 
     res.json({
