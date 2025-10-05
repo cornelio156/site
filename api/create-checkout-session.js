@@ -129,8 +129,8 @@ export default async function handler(req, res) {
       // Completely disable customer email collection
       customer_creation: 'if_required',
       // Note: collect_shipping_address is not a supported parameter in this API version
-      // Disable billing address collection completely
-      billing_address_collection: 'never',
+      // Let Stripe decide when to collect billing address
+      billing_address_collection: 'auto',
       // Disable automatic tax calculation to avoid additional requirements
       automatic_tax: { enabled: false },
       // Allow guest checkout without any customer info
