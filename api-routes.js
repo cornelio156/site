@@ -550,7 +550,7 @@ router.post('/create-checkout-session', async (req, res) => {
 
     // Create checkout session
     const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
+      automatic_payment_methods: { enabled: true },
       line_items: [
         {
           price_data: {
@@ -575,8 +575,7 @@ router.post('/create-checkout-session', async (req, res) => {
       automatic_tax: { enabled: false },
       // Allow guest checkout without any customer info
       allow_promotion_codes: false,
-      // Disable customer email completely
-      customer_email: null,
+      // Do not send customer_email when not available/valid
       // Use guest checkout mode
       payment_method_options: {
         card: {

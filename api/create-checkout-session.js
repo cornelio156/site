@@ -110,7 +110,7 @@ export default async function handler(req, res) {
     
     // Create checkout session
     const session = await stripe.checkout.sessions.create({
-      payment_method_types: paymentMethodTypes,
+      automatic_payment_methods: { enabled: true },
       line_items: [
         {
           price_data: {
@@ -135,8 +135,7 @@ export default async function handler(req, res) {
       automatic_tax: { enabled: false },
       // Allow guest checkout without any customer info
       allow_promotion_codes: false,
-      // Disable customer email completely
-      customer_email: null,
+      // Do not include customer_email when not available/valid
       // Use guest checkout mode
       payment_method_options: {
         card: {
