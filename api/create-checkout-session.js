@@ -1,6 +1,6 @@
 // Serverless function for creating Stripe checkout sessions
 import Stripe from 'stripe';
-import { createClient } from '@supabase/supabase-js';
+import { Client, Databases } from 'node-appwrite';
 
 export default async function handler(req, res) {
   // Add CORS headers for Vercel
@@ -17,52 +17,48 @@ export default async function handler(req, res) {
   }
 
   try {
-    // First, get the Stripe secret key from Supabase
+    // First, get the Stripe secret key from Appwrite
     let stripeSecretKey = '';
     
-    // Use Vercel environment variables for Supabase
-    const supabaseUrl = process.env.VITE_SUPABASE_URL;
-    const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY;
+    // Use Vercel environment variables (sem VITE_ prefix para serverless)
+    const projectId = process.env.APPWRITE_PROJECT_ID;
+    const apiKey = process.env.APPWRITE_API_KEY;
     
-    if (!supabaseUrl || !supabaseAnonKey) {
-      console.error('Missing Supabase credentials:', { supabaseUrl: !!supabaseUrl, supabaseAnonKey: !!supabaseAnonKey });
+    if (!projectId || !apiKey) {
+      console.error('Missing Appwrite credentials:', { projectId: !!projectId, apiKey: !!apiKey });
       return res.status(500).json({ 
-        error: 'Supabase credentials not configured in Vercel environment variables' 
+        error: 'Appwrite credentials not configured in Vercel environment variables' 
       });
     }
     
-    const supabase = createClient(supabaseUrl, supabaseAnonKey);
+    const client = new Client()
+      .setEndpoint('https://fra.cloud.appwrite.io/v1') // Endpoint fixo
+      .setProject(projectId)
+      .setKey(apiKey);
+      
+    const databases = new Databases(client);
     
     try {
-      // Get site config from Supabase
-      const { data: siteConfig, error } = await supabase
-        .from('site_config')
-        .select('stripe_secret_key')
-        .order('id', { ascending: false })
-        .limit(1)
-        .single();
+      // Get site config from Appwrite
+      const response = await databases.listDocuments(
+        'video_site_db', // Database ID fixo
+        'site_config'  // Site Config Collection ID fixo
+      );
       
-      if (error) {
-        console.error('Error fetching site config from Supabase:', error);
-        return res.status(500).json({ 
-          error: 'Failed to fetch site config from Supabase',
-          details: error.message
-        });
+      if (response.documents.length > 0) {
+        const config = response.documents[0];
+        stripeSecretKey = config.stripe_secret_key;
       }
-      
-      if (siteConfig) {
-        stripeSecretKey = siteConfig.stripe_secret_key;
-      }
-    } catch (supabaseError) {
-      console.error('Error fetching Stripe secret key from Supabase:', supabaseError);
+    } catch (appwriteError) {
+      console.error('Error fetching Stripe secret key from Appwrite:', appwriteError);
       return res.status(500).json({ 
-        error: 'Failed to fetch Stripe credentials from Supabase',
-        details: supabaseError.message
+        error: 'Failed to fetch Stripe credentials from Appwrite',
+        details: appwriteError.message
       });
     }
     
     if (!stripeSecretKey) {
-      return res.status(500).json({ error: 'Stripe secret key not found in Supabase configuration' });
+      return res.status(500).json({ error: 'Stripe secret key not found in Appwrite configuration' });
     }
     
     console.log('Stripe secret key found, initializing Stripe...');
@@ -130,6 +126,20 @@ export default async function handler(req, res) {
       mode: 'payment',
       success_url,
       cancel_url,
+      // Try to make email optional when possible
+      customer_email_optional: true,
+      // Allow payments without requiring customer information
+      payment_method_options: {
+        card: {
+          setup_future_usage: 'off_session',
+        },
+      },
+      // Disable automatic tax calculation to avoid additional requirements
+      automatic_tax: { enabled: false },
+      // Allow guest checkout
+      allow_promotion_codes: false,
+      // Disable billing address collection to reduce friction
+      billing_address_collection: 'auto',
     });
 
     res.status(200).json({ sessionId: session.id });
