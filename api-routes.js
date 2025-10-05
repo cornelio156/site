@@ -7,7 +7,7 @@ import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } fro
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import multer from 'multer';
 import Stripe from 'stripe';
-import { SiteConfigServiceSupabase } from './src/services/SiteConfigServiceSupabase.js';
+import { wasabiBackendService } from './server/services/WasabiBackendService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -519,8 +519,8 @@ router.post('/create-checkout-session', async (req, res) => {
       return res.status(400).json({ error: 'Missing required parameters' });
     }
 
-    const siteConfig = await SiteConfigServiceSupabase.getSiteConfig();
-    const stripeSecretKey = siteConfig?.stripeSecretKey;
+    const siteConfig = await wasabiBackendService.getSiteConfig();
+    const stripeSecretKey = siteConfig.stripeSecretKey;
 
     if (!stripeSecretKey) {
       return res.status(500).json({ error: 'Stripe secret key not configured' });
