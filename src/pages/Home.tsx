@@ -301,28 +301,9 @@ const Home: FC = () => {
     if (telegramUsername) {
       // Create special offer message for Telegram
       const specialOfferMessage = `
-🎉 *SPECIAL OFFER - ALL CONTENT FOR $95* 🎉
+Hi! I'm interested in this promotion for all content.
 
-Hi! I'm interested in your special offer:
-
-💰 *What I want:*
-• Access to ALL premium content
-• Complete video collection
-• Special price: $95 (instead of individual purchases)
-
-💳 *Payment Methods Available:*
-• PayPal
-• Stripe (cards, Apple Pay, etc.)
-• Crypto (Bitcoin, Ethereum, etc.)
-
-❓ *Questions:*
-• How do I pay?
-• When do I get access?
-• What's included in the $95 package?
-
-Please let me know how to proceed with this special offer!
-
-Thanks! 🙏
+How can I proceed?
       `.trim();
 
       // Encode message for URL
