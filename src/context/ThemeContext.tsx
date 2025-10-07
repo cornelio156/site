@@ -20,8 +20,8 @@ interface ThemeProviderProps {
 }
 
 export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
-  // Start with light theme by default
-  const [mode, setMode] = useState<ThemeMode>('light');
+  // Start with dark theme by default
+  const [mode, setMode] = useState<ThemeMode>('dark');
 
   useEffect(() => {
     // Check if user has a saved theme preference
@@ -29,8 +29,8 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     if (savedTheme) {
       setMode(savedTheme);
     } else {
-      // Set light theme as default
-      localStorage.setItem('theme', 'light');
+      // Set dark theme as default
+      localStorage.setItem('theme', 'dark');
     }
   }, []);
 
