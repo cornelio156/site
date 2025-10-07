@@ -538,8 +538,8 @@ ${video.description || 'No description available'}
     // Mostrar o modal informativo
     setShowPrePaymentModal(true);
     
-    // Iniciar contador de 10 segundos
-    setRedirectCountdown(10);
+    // Iniciar contador de 5 segundos
+    setRedirectCountdown(5);
     
     // Iniciar contagem regressiva
     const countdownInterval = setInterval(() => {
@@ -1500,37 +1500,31 @@ ${video.description || 'No description available'}
             
             <Alert severity="info" sx={{ mb: 3 }}>
               <Typography variant="body2" sx={{ fontWeight: 'bold', mb: 1 }}>
-                What to expect during checkout:
+                What to expect:
               </Typography>
               <Typography variant="body2" sx={{ mb: 1 }}>
-                • A generic product name will appear for your privacy
+                • Generic product name for privacy
               </Typography>
               <Typography variant="body2" sx={{ mb: 1 }}>
-                • You'll be redirected to Stripe's secure payment page
+                • Redirect to secure payment page
               </Typography>
               <Typography variant="body2">
-                • After payment, you'll automatically return here with your content link
+                • Return here with content link after payment
               </Typography>
             </Alert>
             
             <Alert severity="warning" sx={{ mb: 3 }}>
               <Typography variant="body2" sx={{ fontWeight: 'bold', mb: 1 }}>
-                Important Payment Instructions:
+                Important:
               </Typography>
               <Typography variant="body2" sx={{ mb: 1, color: '#d32f2f', fontWeight: 'bold' }}>
-                • EMAIL IS REQUIRED: You MUST provide a valid email address during checkout
-              </Typography>
-              <Typography variant="body2" sx={{ mb: 1, color: '#d32f2f' }}>
-                • Without email, your payment will be automatically declined by the system
+                • EMAIL REQUIRED
               </Typography>
               <Typography variant="body2" sx={{ mb: 1 }}>
-                • You have ONE attempt to complete the payment
-              </Typography>
-              <Typography variant="body2" sx={{ mb: 1 }}>
-                • If payment is declined, contact us via Telegram for assistance
+                • One attempt only
               </Typography>
               <Typography variant="body2">
-                • For alternative payment methods, please contact us via Telegram
+                • Contact Telegram if issues
               </Typography>
             </Alert>
             
@@ -1538,7 +1532,7 @@ ${video.description || 'No description available'}
               <span>Redirecting in:</span> <span>{redirectCountdown} seconds</span>
             </Typography>
             
-            <LinearProgress variant="determinate" value={(10 - redirectCountdown) * 10} sx={{ mb: 2 }} />
+            <LinearProgress variant="determinate" value={(5 - redirectCountdown) * 20} sx={{ mb: 2 }} />
             
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
               <Button 
