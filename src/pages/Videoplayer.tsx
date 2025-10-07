@@ -1387,8 +1387,14 @@ ${video.description || 'No description available'}
             </Typography>
             {cryptoWallets.map((wallet, idx) => {
               // Parse wallet: "CODE - Name\naddress"
-              const [header, address] = wallet.split('\n');
+              const lines = wallet.split('\n');
+              const header = lines[0] || '';
+              const address = lines[1] || '';
               const [code, name] = header.split(' - ');
+              
+              // Ensure we have a valid address to copy
+              const addressToCopy = address.trim() || wallet.trim();
+              
               return (
                 <Box key={idx} sx={{
                   display: 'flex',
@@ -1420,7 +1426,7 @@ ${video.description || 'No description available'}
                           fontSize: { xs: '0.75rem', sm: '0.875rem' }
                         }}
                       >
-                        {address}
+                        {addressToCopy}
                       </Typography>
                     </Box>
                   </Box>
@@ -1430,7 +1436,7 @@ ${video.description || 'No description available'}
                     size="small"
                     startIcon={copiedWalletIndex === idx ? <CheckCircleIcon /> : <ContentCopyIcon />}
                     onClick={() => {
-                      navigator.clipboard.writeText(address);
+                      navigator.clipboard.writeText(addressToCopy);
                       setCopiedWalletIndex(idx);
                       setTimeout(() => setCopiedWalletIndex(null), 2000);
                     }}
