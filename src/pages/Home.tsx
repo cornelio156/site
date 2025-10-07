@@ -360,7 +360,7 @@ Thanks! 🙏
         size="medium" 
       />
       
-      <Container maxWidth="lg" sx={{ py: 6 }}>
+      <Container maxWidth="lg" sx={{ py: { xs: 3, md: 6 } }}>
 
         {/* Special Offer Section */}
         <Box sx={{ 
@@ -625,7 +625,7 @@ Thanks! 🙏
         <Fade in={true} timeout={500}>
           <Box>
             {loading ? (
-              <Grid container spacing={3}>
+              <Grid container spacing={{ xs: 1.5, sm: 2, md: 3 }}>
                 {renderSkeletons()}
               </Grid>
             ) : loadedVideos.length === 0 && !isLoadingMore ? (
@@ -645,7 +645,7 @@ Thanks! 🙏
               </Grow>
             ) : (
               <>
-                <Grid container spacing={3}>
+                <Grid container spacing={{ xs: 1.25, sm: 2, md: 3 }}>
                   {/* Show loaded videos with smooth animation */}
                   {loadedVideos.map((video, index) => (
                     <Grow

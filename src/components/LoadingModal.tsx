@@ -24,6 +24,11 @@ interface LoadingModalProps {
 }
 
 const LoadingModal: React.FC<LoadingModalProps> = ({ open, onClose }) => {
+  // Feature flag: modal de promoção desativado temporariamente
+  const DISABLED = true;
+  if (DISABLED) {
+    return null;
+  }
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [timeLeft, setTimeLeft] = useState(6);

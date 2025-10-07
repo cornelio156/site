@@ -44,6 +44,7 @@ const VideoCard: FC<VideoCardProps> = ({ video }) => {
   const [isVideoLoading, setIsVideoLoading] = useState(false);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [isPlayingInline, setIsPlayingInline] = useState(false);
+  const [showTapHint, setShowTapHint] = useState(true);
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   // Ensure only one card plays at a time
@@ -93,6 +94,7 @@ const VideoCard: FC<VideoCardProps> = ({ video }) => {
     try {
       // Notify other cards to stop
       window.dispatchEvent(new CustomEvent('videocard-play', { detail: { id: video.$id } }));
+      setShowTapHint(false);
       setIsVideoLoading(true);
       const url = await VideoService.getVideoFileUrl(video.$id);
       setVideoUrl(url);
@@ -111,6 +113,7 @@ const VideoCard: FC<VideoCardProps> = ({ video }) => {
     }
     setIsPlayingInline(false);
     setVideoUrl(null);
+    setShowTapHint(true);
   };
 
   const handleStripePay = async (e: React.MouseEvent) => {
@@ -275,8 +278,8 @@ ${video.description || 'No description available'}
           backgroundColor: theme => theme.palette.mode === 'dark' ? '#121212' : '#ffffff',
           border: '1px solid rgba(255,15,80,0.1)',
           '&:hover': {
-            transform: 'translateY(-10px) scale(1.02)',
-            boxShadow: '0 16px 30px rgba(0,0,0,0.25)',
+            transform: { xs: 'none', sm: 'translateY(-10px) scale(1.02)' },
+            boxShadow: { xs: '0 8px 20px rgba(0,0,0,0.15)', sm: '0 16px 30px rgba(0,0,0,0.25)' },
             borderColor: '#FF0F50',
           }
         }}
@@ -411,23 +414,44 @@ ${video.description || 'No description available'}
               style={{ width: '100%', height: '100%', objectFit: 'cover' }}
             />
           ) : (
-            <Box
-              onClick={openInlinePlayer}
-              sx={{
-                width: '70px',
-                height: '70px',
-                borderRadius: '50%',
-                backgroundColor: 'rgba(255,15,80,0.7)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transform: isHovered ? 'scale(1.1)' : 'scale(0.9)',
-                transition: 'all 0.3s ease',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-                cursor: 'pointer'
-              }}
-            >
-              <PlayArrowIcon sx={{ fontSize: 45, color: 'white' }} />
+            <Box onClick={openInlinePlayer} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.75, cursor: 'pointer' }}>
+              <Box
+                sx={{
+                  width: '70px',
+                  height: '70px',
+                  borderRadius: '50%',
+                  backgroundColor: 'rgba(255,15,80,0.75)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transform: isHovered ? 'scale(1.1)' : 'scale(0.9)',
+                  transition: 'all 0.3s ease',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.35)'
+                }}
+              >
+                <PlayArrowIcon sx={{ fontSize: 45, color: 'white' }} />
+              </Box>
+              {showTapHint && (
+                <Box
+                  sx={{
+                    backgroundColor: 'rgba(0,0,0,0.6)',
+                    color: 'white',
+                    px: 1,
+                    py: 0.4,
+                    borderRadius: 999,
+                    fontSize: '0.8rem',
+                    fontWeight: 800,
+                    letterSpacing: 0.4,
+                    lineHeight: 1,
+                    textTransform: 'uppercase',
+                    boxShadow: '0 2px 6px rgba(0,0,0,0.35)',
+                    transition: 'opacity 180ms ease',
+                    opacity: showTapHint ? 1 : 0,
+                  }}
+                >
+                  Tap to play
+                </Box>
+              )}
             </Box>
           )}
         </Box>
@@ -485,7 +509,7 @@ ${video.description || 'No description available'}
         />
       </Box>
       
-      <CardContent sx={{ flexGrow: 1, p: 2, pt: 1.5 }}>
+      <CardContent sx={{ flexGrow: 1, p: { xs: 1.25, md: 2 }, pt: { xs: 1, md: 1.5 } }}>
         <Typography gutterBottom variant="h6" component="div" sx={{
           fontWeight: 'bold',
           fontSize: '1rem',
@@ -517,171 +541,140 @@ ${video.description || 'No description available'}
           )}
         </Box>
 
-        {/* Price display at bottom */}
-        <Box sx={{ 
-          display: 'flex', 
-          justifyContent: 'center', 
-          alignItems: 'center',
-          mt: 1.5,
-          p: 1.5,
-          background: 'linear-gradient(135deg, rgba(255, 15, 80, 0.15) 0%, rgba(209, 13, 66, 0.15) 100%)',
-          borderRadius: 2,
-          border: '2px solid rgba(255, 15, 80, 0.3)',
-          position: 'relative',
-          overflow: 'hidden',
-          '&::before': {
-            content: '""',
-            position: 'absolute',
-            top: 0,
-            left: '-100%',
-            width: '100%',
-            height: '100%',
-            background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent)',
-            animation: 'shimmer 3s infinite'
-          }
-        }}>
-          <Typography 
-            variant="h6" 
-            sx={{ 
-              color: '#FF0F50',
-              fontWeight: 'bold',
-              fontSize: '1.3rem',
-              textAlign: 'center',
-              textShadow: '0 1px 2px rgba(0,0,0,0.1)',
-              position: 'relative',
-              zIndex: 1
-            }}
-          >
-            ${video.price.toFixed(2)}
-          </Typography>
-        </Box>
+        {/* Price chip movido para a linha de ações */}
 
-        {/* Action buttons after price */}
+        {/* Action buttons after price (linha dos botões secundários) */}
         <Box sx={{ 
           display: 'flex', 
           gap: 1, 
-          justifyContent: 'center',
-          mt: 1.5,
-          px: 1
+          justifyContent: 'flex-start',
+          alignItems: 'center',
+          mt: { xs: 1, md: 1.5 },
+          px: { xs: 0.5, md: 1 },
+          minHeight: { xs: 36, md: 44 } // garante altura consistente da linha de botões
         }}>
-          {/* Play icon button (always visible) */}
-          <Tooltip title={'Play here'} arrow>
-            <IconButton
-              size="small"
-              onClick={openInlinePlayer}
-              sx={{
-                backgroundColor: 'rgba(255,15,80,0.12)',
-                color: '#FF0F50',
-                '&:hover': {
-                  backgroundColor: 'rgba(255,15,80,0.2)',
-                  transform: 'scale(1.05)'
-                }
-              }}
-            >
-              <PlayArrowIcon />
-            </IconButton>
-          </Tooltip>
+          <Box sx={{ display: 'flex', gap: { xs: 1, md: 1 }, alignItems: 'center', flexGrow: 1 }}>
 
-          {/* Details button */}
-          <Tooltip title="Details" arrow>
-            <Button
-              variant="contained"
-              size="small"
-              startIcon={<PreviewIcon />}
-              onClick={handlePreviewClick}
-              sx={{
-                backgroundColor: 'rgba(33, 150, 243, 0.9)',
-                color: 'white',
-                fontWeight: 'bold',
-                fontSize: '0.75rem',
-                minWidth: 'auto',
-                px: 1.5,
-                py: 0.5,
-                '&:hover': {
-                  backgroundColor: 'rgba(33, 150, 243, 1)',
-                  transform: 'scale(1.05)',
-                },
-              }}
-            >
-              Details
-            </Button>
-          </Tooltip>
-
-          {/* Stripe pay button */
-          }
-          {stripePublishableKey && (
-            <Tooltip title="Pay with card (Stripe)" arrow>
-              <Button
-                variant="contained"
-                size="medium"
-                onClick={handleStripePay}
-                disabled={stripeLoading}
-                sx={{
-                  backgroundColor: '#ffffff',
-                  color: '#FF0F50',
-                  border: '1px solid #FF0F50',
-                  fontWeight: 800,
-                  letterSpacing: 0.2,
-                  boxShadow: '0 6px 14px rgba(0,0,0,0.08)',
-                  px: 2,
-                  py: 0.7,
-                  '&:hover': {
-                    backgroundColor: '#f7f7f7',
-                    transform: 'translateY(-1px) scale(1.02)'
-                  }
-                }}
-              >
-                {stripeLoading ? '...' : 'Pay'}
-              </Button>
-            </Tooltip>
-          )}
-
-          {/* Get content button (product link) visible when purchased and link exists */}
-          {video.isPurchased && video.product_link && (
-            <Tooltip title="Get content" arrow>
+            {/* Details button */}
+            <Tooltip title="Details" arrow>
               <Button
                 variant="contained"
                 size="small"
-                onClick={(e) => { e.stopPropagation(); window.open(video.product_link as string, '_blank'); }}
+                onClick={handlePreviewClick}
                 sx={{
                   backgroundColor: 'rgba(33, 150, 243, 0.9)',
                   color: 'white',
                   fontWeight: 'bold',
-                  fontSize: '0.75rem',
-                  minWidth: 'auto',
-                  px: 1.5,
-                  py: 0.5,
+                  fontSize: { xs: '0.9rem', md: '0.74rem' },
+                  minWidth: { xs: 110, md: 'auto' },
+                  px: { xs: 2.2, md: 1.2 },
+                  py: { xs: 0.7, md: 0.45 },
+                  borderRadius: 999,
                   '&:hover': {
                     backgroundColor: 'rgba(33, 150, 243, 1)',
-                    transform: 'scale(1.05)'
-                  }
-                }}
-              >
-                Get Content
-              </Button>
-            </Tooltip>
-          )}
-
-          {/* Telegram button */}
-          {telegramUsername && (
-            <Tooltip title="Contact on Telegram" arrow>
-              <IconButton
-                size="small"
-                onClick={handleTelegramClick}
-                sx={{
-                  backgroundColor: 'rgba(0, 136, 204, 0.9)',
-                  color: 'white',
-                  width: 36,
-                  height: 36,
-                  '&:hover': {
-                    backgroundColor: 'rgba(0, 136, 204, 1)',
                     transform: 'scale(1.05)',
                   },
                 }}
               >
-                <TelegramIcon sx={{ fontSize: 18 }} />
-              </IconButton>
+                Details
+              </Button>
             </Tooltip>
+
+            {/* Get content button (product link) visible when purchased and link exists */}
+            {video.isPurchased && video.product_link && (
+              <Tooltip title="Get content" arrow>
+                <Button
+                  variant="contained"
+                  size="small"
+                  onClick={(e) => { e.stopPropagation(); window.open(video.product_link as string, '_blank'); }}
+                  sx={{
+                    backgroundColor: 'rgba(33, 150, 243, 0.9)',
+                    color: 'white',
+                    fontWeight: 'bold',
+                    fontSize: '0.75rem',
+                    minWidth: 'auto',
+                px: { xs: 1, md: 1.5 },
+                py: { xs: 0.4, md: 0.5 },
+                    '&:hover': {
+                      backgroundColor: 'rgba(33, 150, 243, 1)',
+                      transform: 'scale(1.05)'
+                    }
+                  }}
+                >
+                  Get Content
+                </Button>
+              </Tooltip>
+            )}
+
+            {/* Telegram button */}
+            {telegramUsername && (
+              <Tooltip title="Contact on Telegram" arrow>
+                <IconButton
+                  size="small"
+                  onClick={handleTelegramClick}
+                  sx={{
+                    backgroundColor: 'rgba(0, 136, 204, 0.9)',
+                    color: 'white',
+                    width: { xs: 44, md: 36 },
+                    height: { xs: 44, md: 36 },
+                    '&:hover': {
+                      backgroundColor: 'rgba(0, 136, 204, 1)',
+                      transform: 'scale(1.05)',
+                    },
+                  }}
+                >
+                  <TelegramIcon sx={{ fontSize: 18 }} />
+                </IconButton>
+              </Tooltip>
+            )}
+          </Box>
+
+          {/* Price chip à direita */}
+          <Box sx={{ 
+            display: 'flex', 
+            alignItems: 'center',
+            px: 1,
+            py: 0.4,
+            background: 'rgba(255, 15, 80, 0.08)',
+            borderRadius: 999,
+            border: '1px solid rgba(255, 15, 80, 0.35)',
+            transform: { xs: 'scale(0.95)', md: 'none' },
+            ml: 'auto'
+          }}>
+            <Typography component="span" sx={{ color: '#FF0F50', fontWeight: 900, fontSize: '0.85rem', letterSpacing: 0.2, lineHeight: 1 }}>
+              ${video.price.toFixed(2)}
+            </Typography>
+          </Box>
+        </Box>
+
+        {/* Botão Pay em uma linha separada abaixo dos demais */}
+        <Box sx={{ mt: 1.5, px: 1 }}>
+          {stripePublishableKey ? (
+            <Button
+              fullWidth
+              variant="contained"
+              size="large"
+              onClick={handleStripePay}
+              disabled={stripeLoading}
+              startIcon={<CreditCardIcon />}
+              sx={{
+                background: 'linear-gradient(90deg, #6A00FF 0%, #9B00FF 100%)',
+                color: '#ffffff',
+                fontWeight: 900,
+                letterSpacing: 0.4,
+                py: 1.1,
+                boxShadow: '0 10px 20px rgba(107, 0, 255, 0.35)',
+                '&:hover': {
+                  background: 'linear-gradient(90deg, #5E00E6 0%, #8C00E6 100%)',
+                  transform: 'translateY(-1px)'
+                }
+              }}
+            >
+              {stripeLoading ? 'Processing…' : 'Pay'}
+            </Button>
+          ) : (
+            // Espaço reservado para manter altura igual entre cards quando Stripe não está ativo
+            <Box sx={{ height: 48 }} />
           )}
         </Box>
       </CardContent>
