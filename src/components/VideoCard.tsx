@@ -556,7 +556,7 @@ ${video.description || 'No description available'}
           <Box sx={{ display: 'flex', gap: { xs: 1, md: 1 }, alignItems: 'center', flexGrow: 1 }}>
 
             {/* Details button */}
-            <Tooltip title="Details" arrow>
+            <Tooltip title="Preview" arrow>
               <Button
                 variant="contained"
                 size="small"
@@ -576,7 +576,7 @@ ${video.description || 'No description available'}
                   },
                 }}
               >
-                Details
+                Preview
               </Button>
             </Tooltip>
 
