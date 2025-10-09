@@ -301,7 +301,7 @@ const Home: FC = () => {
     if (telegramUsername) {
       // Create special offer message for Telegram
       const specialOfferMessage = `
-Hi! I'm interested in this promotion for all content.
+Hi! I'm interested in this promotion for all content for only $90.
 
 How can I proceed?
       `.trim();
@@ -396,7 +396,7 @@ How can I proceed?
             textShadow: '0 3px 6px rgba(0,0,0,0.3)',
             fontSize: { xs: '1.5rem', md: '2rem' }
           }}>
-            ALL CONTENT FOR ONLY $95
+            ALL CONTENT FOR ONLY $90
           </Typography>
           <Typography variant="h6" sx={{ 
             mb: 2, 
