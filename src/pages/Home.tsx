@@ -17,9 +17,8 @@ import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import Skeleton from '@mui/material/Skeleton';
 import Tooltip from '@mui/material/Tooltip';
-// import TextField from '@mui/material/TextField'; // Removed - no longer needed
-// import InputAdornment from '@mui/material/InputAdornment'; // Removed - no longer needed
-// import SearchIcon from '@mui/icons-material/Search'; // Removed - no longer needed
+import ToggleButton from '@mui/material/ToggleButton';
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Paper from '@mui/material/Paper';
 import { Chip } from '@mui/material';
 import { useAuth } from '../services/Auth';
@@ -134,6 +133,7 @@ const Home: FC = () => {
   // const [quickSearchQuery, setQuickSearchQuery] = useState(''); // Removed - no longer needed
   const [loadedVideos, setLoadedVideos] = useState<Video[]>([]);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [selectedFilter, setSelectedFilter] = useState<SortOption>(SortOption.VIEWS_DESC);
   
   const { user } = useAuth();
   const { videoListTitle, telegramUsername } = useSiteConfig();
@@ -148,7 +148,7 @@ const Home: FC = () => {
         setLoadedVideos([]); // Reset loaded videos
         
         // Get video IDs first (ultra-fast operation - no metadata loading)  
-        const allVideoIds = await VideoService.getVideoIds(SortOption.VIEWS_DESC);
+        const allVideoIds = await VideoService.getVideoIds(selectedFilter);
         const totalPages = Math.ceil(allVideoIds.length / videosPerPage);
         setTotalPages(totalPages);
         
@@ -173,7 +173,7 @@ const Home: FC = () => {
     
     // Sempre mostrar o botão de configuração (não dependemos mais do Appwrite)
     setShowSetupButton(false);
-  }, [user, page]);
+  }, [user, page, selectedFilter]);
 
   // Function to load videos one by one (immediate first video)
   const loadVideosOneByOne = async (videoIds: string[]) => {
@@ -252,6 +252,13 @@ const Home: FC = () => {
         });
       }
     }, 100);
+  };
+
+  const handleFilterChange = (event: React.MouseEvent<HTMLElement>, newFilter: SortOption | null) => {
+    if (newFilter !== null) {
+      setSelectedFilter(newFilter);
+      setPage(1); // Reset to first page when changing filter
+    }
   };
 
   // Render skeleton loaders during loading state
@@ -471,6 +478,49 @@ Thanks!
             <Typography variant="h4" component="h2" gutterBottom>
               {videoListTitle || 'Featured Videos'}
             </Typography>
+            
+            {/* Filter Bar */}
+            <Box sx={{ mb: 2 }}>
+              <ToggleButtonGroup
+                value={selectedFilter}
+                exclusive
+                onChange={handleFilterChange}
+                aria-label="video filters"
+                size="small"
+                sx={{
+                  '& .MuiToggleButton-root': {
+                    border: '1px solid rgba(255, 15, 80, 0.3)',
+                    color: '#FF0F50',
+                    fontWeight: 'bold',
+                    px: 2,
+                    py: 0.5,
+                    '&.Mui-selected': {
+                      backgroundColor: '#FF0F50',
+                      color: 'white',
+                      '&:hover': {
+                        backgroundColor: '#D10D42',
+                      }
+                    },
+                    '&:hover': {
+                      backgroundColor: 'rgba(255, 15, 80, 0.1)',
+                    }
+                  }
+                }}
+              >
+                <ToggleButton value={SortOption.VIEWS_DESC} aria-label="most viewed">
+                  🔥 Most Viewed
+                </ToggleButton>
+                <ToggleButton value={SortOption.NEWEST} aria-label="recent">
+                  🆕 Recent
+                </ToggleButton>
+                <ToggleButton value={SortOption.PRICE_DESC} aria-label="expensive">
+                  💰 Expensive
+                </ToggleButton>
+                <ToggleButton value={SortOption.PRICE_ASC} aria-label="cheap">
+                  💸 Cheap
+                </ToggleButton>
+              </ToggleButtonGroup>
+            </Box>
             {!loading && loadedVideos.length > 0 && (
               <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mt: 1, alignItems: 'center' }}>
                 <Chip 

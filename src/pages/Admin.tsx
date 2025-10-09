@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, ChangeEvent } from 'react';
 import type { FC } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../services/Auth';
-import { VideoService } from '../services/VideoService';
+import { VideoServiceSupabase } from '../services/VideoServiceSupabase';
 import { wasabiService } from '../services/WasabiService';
 import { useSiteConfig } from '../context/SiteConfigContext';
 import { UserServiceSupabase } from '../services/UserServiceSupabase';
@@ -309,10 +309,10 @@ const Admin: FC = () => {
       setLoading(true);
       setError(null);
       
-      const allVideos = await VideoService.getAllVideos();
-      console.log(`Admin: Fetched ${allVideos.length} videos using VideoService`);
+      const allVideos = await VideoServiceSupabase.getAllVideos();
+      console.log(`Admin: Fetched ${allVideos.length} videos using VideoServiceSupabase`);
       
-      // Convert VideoService format to Admin format
+      // Convert VideoServiceSupabase format to Admin format
       const adminVideos = allVideos.map(video => ({
         $id: video.$id,
         title: video.title,
@@ -468,7 +468,7 @@ const Admin: FC = () => {
       setLoading(true);
       setError(null);
       
-      const success = await VideoService.deleteVideo(id);
+      const success = await VideoServiceSupabase.deleteVideo(id);
       
       if (success) {
         showFeedback('Video successfully deleted!', 'success');
@@ -521,7 +521,7 @@ const Admin: FC = () => {
           if (adminPassword) {
             const passwordSuccess = await UserServiceSupabase.changePassword(editingAdmin, adminPassword);
             if (!passwordSuccess) {
-              showFeedback('Admin updated but password change failed', 'warning');
+              showFeedback('Admin updated but password change failed', 'error');
               return;
             }
           }
@@ -710,8 +710,8 @@ const Admin: FC = () => {
       setUploadProgress(90);
 
       if (editingVideo) {
-        // Update existing video using VideoService (which uses Supabase)
-        const updatedVideo = await VideoService.updateVideo(editingVideo, videoData);
+        // Update existing video using VideoServiceSupabase
+        const updatedVideo = await VideoServiceSupabase.updateVideo(editingVideo, videoData);
         if (updatedVideo) {
           showFeedback('Video updated successfully!', 'success');
           fetchVideos();
@@ -721,8 +721,8 @@ const Admin: FC = () => {
           showFeedback('Failed to update video', 'error');
         }
       } else {
-        // Create new video using VideoService (which uses Supabase)
-        const newVideo = await VideoService.createVideo(videoData);
+        // Create new video using VideoServiceSupabase
+        const newVideo = await VideoServiceSupabase.createVideo(videoData);
         if (newVideo) {
           showFeedback('Video uploaded successfully!', 'success');
           fetchVideos();
