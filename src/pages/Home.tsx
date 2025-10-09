@@ -148,7 +148,7 @@ const Home: FC = () => {
         setLoadedVideos([]); // Reset loaded videos
         
         // Get video IDs first (ultra-fast operation - no metadata loading)
-        const allVideoIds = await VideoService.getVideoIds(SortOption.NEWEST);
+        const allVideoIds = await VideoService.getVideoIds(SortOption.MOST_VIEWED);
         const totalPages = Math.ceil(allVideoIds.length / videosPerPage);
         setTotalPages(totalPages);
         
