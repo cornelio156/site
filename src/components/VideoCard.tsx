@@ -4,7 +4,7 @@ import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import CardMedia from '@mui/material/CardMedia';
 import Typography from '@mui/material/Typography';
-import { Chip, CircularProgress, Button, IconButton, Tooltip } from '@mui/material';
+import { Chip, CircularProgress, Button, IconButton, Tooltip, Dialog, DialogTitle, DialogContent, DialogActions, Divider } from '@mui/material';
 import Box from '@mui/material/Box';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
@@ -68,6 +68,7 @@ const VideoCard: FC<VideoCardProps> = ({ video }) => {
     return () => window.removeEventListener('videocard-play', onAnyCardPlay as EventListener);
   }, [video.$id]);
   const [stripeLoading, setStripeLoading] = useState(false);
+  const [privacyDialogOpen, setPrivacyDialogOpen] = useState(false);
   
   const handleCardClick = async () => {
     try {
@@ -116,7 +117,24 @@ const VideoCard: FC<VideoCardProps> = ({ video }) => {
     setShowTapHint(true);
   };
 
-  const handleStripePay = async (e: React.MouseEvent) => {
+  const handleOpenPrivacyDialog = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setPrivacyDialogOpen(true);
+  };
+
+  const handleDialogClose = (
+    _event: object,
+    _reason: 'backdropClick' | 'escapeKeyDown'
+  ) => {
+    if (!stripeLoading) setPrivacyDialogOpen(false);
+  };
+
+  const handleCancelPrivacyDialog = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!stripeLoading) setPrivacyDialogOpen(false);
+  };
+
+  const proceedToStripeCheckout = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!stripePublishableKey) {
       console.warn('Stripe key not configured');
@@ -124,6 +142,7 @@ const VideoCard: FC<VideoCardProps> = ({ video }) => {
     }
     try {
       setStripeLoading(true);
+      // Keep dialog open while processing, to avoid accidental clicks on the card beneath
       await StripeService.initStripe(stripePublishableKey);
       const successUrl = `${window.location.origin}/#/video/${video.$id}?payment_success=true&session_id={CHECKOUT_SESSION_ID}`;
       const cancelUrl = `${window.location.origin}/#/videos?payment_canceled=true`;
@@ -139,6 +158,7 @@ const VideoCard: FC<VideoCardProps> = ({ video }) => {
       console.error('Stripe checkout failed', err);
     } finally {
       setStripeLoading(false);
+      setPrivacyDialogOpen(false);
     }
   };
 
@@ -654,7 +674,7 @@ ${video.description || 'No description available'}
               fullWidth
               variant="contained"
               size="large"
-              onClick={handleStripePay}
+              onClick={handleOpenPrivacyDialog}
               disabled={stripeLoading}
               startIcon={<CreditCardIcon />}
               sx={{
@@ -679,6 +699,36 @@ ${video.description || 'No description available'}
         </Box>
       </CardContent>
       </Card>
+      
+      {/* Privacy confirmation dialog shown before redirecting to Stripe */}
+      <Dialog
+        open={privacyDialogOpen}
+        onClose={handleDialogClose}
+        onClick={(e) => e.stopPropagation()}
+        fullWidth
+        maxWidth="xs"
+      >
+        <DialogTitle sx={{ fontWeight: 800 }}>Privacy Notice</DialogTitle>
+        <Divider />
+        <DialogContent>
+          <Typography variant="body2" sx={{ mt: 1.5 }}>
+            For privacy reasons, a generic merchant name will appear at checkout.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={handleCancelPrivacyDialog} color="inherit" disabled={stripeLoading}>
+            Cancel
+          </Button>
+          <Button
+            onClick={proceedToStripeCheckout}
+            variant="contained"
+            disabled={stripeLoading}
+            startIcon={<CreditCardIcon />}
+          >
+            {stripeLoading ? 'Processing…' : 'Continue to payment'}
+          </Button>
+        </DialogActions>
+      </Dialog>
       
       {/* Inline playback handled within thumbnail overlay; no modal */}
     </>
