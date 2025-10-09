@@ -147,8 +147,8 @@ const Home: FC = () => {
         setError(null);
         setLoadedVideos([]); // Reset loaded videos
         
-        // Get video IDs first (ultra-fast operation - no metadata loading)
-        const allVideoIds = await VideoService.getVideoIds(SortOption.MOST_VIEWED);
+        // Get video IDs first (ultra-fast operation - no metadata loading)  
+        const allVideoIds = await VideoService.getVideoIds(SortOption.VIEWS_DESC);
         const totalPages = Math.ceil(allVideoIds.length / videosPerPage);
         setTotalPages(totalPages);
         
@@ -301,9 +301,11 @@ const Home: FC = () => {
     if (telegramUsername) {
       // Create special offer message for Telegram
       const specialOfferMessage = `
-Hi! I'm interested in this promotion for all content for only $90.
+Hey! Saw your $90 deal for everything 🔥
 
-How can I proceed?
+I want in! How do I pay?
+
+Thanks!
       `.trim();
 
       // Encode message for URL
