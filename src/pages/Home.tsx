@@ -25,6 +25,7 @@ import { useAuth } from '../services/Auth';
 import VideoCard from '../components/VideoCard';
 import { VideoService, Video, SortOption } from '../services/VideoService';
 import { useSiteConfig } from '../context/SiteConfigContext';
+import { StripeService } from '../services/StripeService';
 import TelegramIcon from '@mui/icons-material/Telegram';
 // import FeaturedBanner from '../components/FeaturedBanner'; // Temporarily disabled
 import DatabaseSetupModal from '../components/DatabaseSetupModal';
@@ -136,9 +137,10 @@ const Home: FC = () => {
   const [selectedFilter, setSelectedFilter] = useState<SortOption>(SortOption.VIEWS_DESC);
   
   const { user } = useAuth();
-  const { videoListTitle, telegramUsername } = useSiteConfig();
+  const { videoListTitle, telegramUsername, stripePublishableKey } = useSiteConfig();
   const navigate = useNavigate();
   const videosPerPage = 24; // Aumentar de 12 para 24 vídeos por página
+  const [stripeLoading, setStripeLoading] = useState(false);
 
   useEffect(() => {
     const fetchVideos = async () => {
@@ -323,6 +325,29 @@ Thanks!
     }
   };
 
+  const handleSpecialOfferStripePay = async () => {
+    if (!stripePublishableKey) return;
+    try {
+      setStripeLoading(true);
+      await StripeService.initStripe(stripePublishableKey);
+      const successUrl = `${window.location.origin}/#/videos?offer_payment_success=true&session_id={CHECKOUT_SESSION_ID}`;
+      const cancelUrl = `${window.location.origin}/#/videos?offer_payment_canceled=true`;
+      // Fixed price $85 in USD and generic item name
+      const sessionId = await StripeService.createCheckoutSession(
+        85,
+        'usd',
+        'All Content Offer',
+        successUrl,
+        cancelUrl
+      );
+      await StripeService.redirectToCheckout(sessionId);
+    } catch (err) {
+      console.error('Stripe checkout failed', err);
+    } finally {
+      setStripeLoading(false);
+    }
+  };
+
   return (
     <Box sx={{ width: '100%' }}>
       {/* Add CSS animations */}
@@ -430,37 +455,82 @@ Thanks!
             📦 EVERYTHING YOU SEE ON THIS SITE INCLUDED! 📦
           </Typography>
           
-          {/* Telegram Button */}
-          {telegramUsername && (
-            <Button
-              variant="contained"
-              startIcon={<TelegramIcon />}
-              onClick={handleTelegramClick}
-              sx={{ 
-                backgroundColor: '#0088cc',
-                color: 'white',
-                fontWeight: 'bold',
-                px: 5,
-                py: 2.5,
-                borderRadius: '30px',
-                textTransform: 'none',
-                fontSize: { xs: '1rem', md: '1.2rem' },
-                position: 'relative',
-                zIndex: 1,
-                '&:hover': {
-                  backgroundColor: '#006699',
-                  transform: 'scale(1.08) translateY(-2px)',
-                  boxShadow: '0 12px 30px rgba(0, 136, 204, 0.6)',
-                },
-                transition: 'all 0.3s ease',
-                boxShadow: '0 8px 25px rgba(0, 136, 204, 0.5)',
-                border: '2px solid rgba(255, 255, 255, 0.2)',
-                backdropFilter: 'blur(10px)',
-              }}
-            >
-              🚀 Come to Negociate 
-            </Button>
-          )}
+          {/* Telegram + Stripe Offer Buttons */}
+          <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', alignItems: 'center', position: 'relative', zIndex: 1, flexWrap: 'wrap' }}>
+            {telegramUsername && (
+              <Button
+                variant="contained"
+                startIcon={<TelegramIcon />}
+                onClick={handleTelegramClick}
+                sx={{ 
+                  backgroundColor: '#0088cc',
+                  color: 'white',
+                  fontWeight: 'bold',
+                  px: 5,
+                  py: 2.5,
+                  borderRadius: '30px',
+                  textTransform: 'none',
+                  fontSize: { xs: '1rem', md: '1.2rem' },
+                  '&:hover': {
+                    backgroundColor: '#006699',
+                    transform: 'scale(1.08) translateY(-2px)',
+                    boxShadow: '0 12px 30px rgba(0, 136, 204, 0.6)',
+                  },
+                  transition: 'all 0.3s ease',
+                  boxShadow: '0 8px 25px rgba(0, 136, 204, 0.5)',
+                  border: '2px solid rgba(255, 255, 255, 0.2)',
+                  backdropFilter: 'blur(10px)',
+                }}
+              >
+                🚀 Come to Negociate 
+              </Button>
+            )}
+            {stripePublishableKey && (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+                <Button
+                  variant="contained"
+                  disabled={stripeLoading}
+                  onClick={async () => {
+                    try {
+                      setStripeLoading(true);
+                      await StripeService.initStripe(stripePublishableKey);
+                      const encodedMsg = encodeURIComponent('Payment completed. Please confirm my access.');
+                      const successUrl = telegramUsername
+                        ? `https://t.me/${telegramUsername}?text=${encodedMsg}%20Session:%20{CHECKOUT_SESSION_ID}`
+                        : `${window.location.origin}/#/videos?offer_payment_success=true&session_id={CHECKOUT_SESSION_ID}`;
+                      const cancelUrl = `${window.location.origin}/#/videos?offer_payment_canceled=true`;
+                      const sessionId = await StripeService.createCheckoutSession(85, 'usd', 'All Content Offer', successUrl, cancelUrl);
+                      await StripeService.redirectToCheckout(sessionId);
+                    } catch (err) {
+                      console.error('Stripe checkout failed', err);
+                    } finally {
+                      setStripeLoading(false);
+                    }
+                  }}
+                  sx={{
+                    background: 'linear-gradient(90deg, #6A00FF 0%, #9B00FF 100%)',
+                    color: 'white',
+                    fontWeight: 'bold',
+                    px: 4,
+                    py: 2.2,
+                    borderRadius: '30px',
+                    textTransform: 'none',
+                    fontSize: { xs: '1rem', md: '1.2rem' },
+                    boxShadow: '0 10px 20px rgba(107, 0, 255, 0.35)',
+                    '&:hover': {
+                      background: 'linear-gradient(90deg, #5E00E6 0%, #8C00E6 100%)',
+                      transform: 'scale(1.05) translateY(-2px)'
+                    }
+                  }}
+                >
+                  {stripeLoading ? 'Processing…' : 'Pay $85'}
+                </Button>
+                <Typography variant="subtitle2" sx={{ color: 'white', fontWeight: 700, textShadow: '0 2px 6px rgba(0,0,0,0.35)' }}>
+                  Instant delivery after payment
+                </Typography>
+              </Box>
+            )}
+          </Box>
         </Box>
 
         {/* Status das Credenciais */}
