@@ -575,25 +575,28 @@ ${video.description || 'No description available'}
         }}>
           <Box sx={{ display: 'flex', gap: { xs: 1, md: 1 }, alignItems: 'center', flexGrow: 1 }}>
 
-            {/* Details button */}
+            {/* Preview button */}
             <Tooltip title="Preview" arrow>
               <Button
                 variant="contained"
                 size="small"
                 onClick={handlePreviewClick}
+                startIcon={<VisibilityIcon sx={{ fontSize: 18 }} />}
                 sx={{
-                  backgroundColor: 'rgba(33, 150, 243, 0.9)',
-                  color: 'white',
-                  fontWeight: 'bold',
-                  fontSize: { xs: '0.9rem', md: '0.74rem' },
-                  minWidth: { xs: 110, md: 'auto' },
-                  px: { xs: 2.2, md: 1.2 },
-                  py: { xs: 0.7, md: 0.45 },
-                  borderRadius: 999,
+                  background: 'linear-gradient(90deg, #6A00FF 0%, #9B00FF 100%)',
+                  color: '#ffffff',
+                  fontWeight: 900,
+                  letterSpacing: 0.2,
+                  fontSize: { xs: '0.9rem', md: '0.8rem' },
+                  minWidth: { xs: 120, md: 'auto' },
+                  px: { xs: 2, md: 1.6 },
+                  py: { xs: 0.7, md: 0.6 },
+                  borderRadius: 1.5,
+                  boxShadow: '0 6px 14px rgba(107, 0, 255, 0.25)',
                   '&:hover': {
-                    backgroundColor: 'rgba(33, 150, 243, 1)',
-                    transform: 'scale(1.05)',
-                  },
+                    background: 'linear-gradient(90deg, #5E00E6 0%, #8C00E6 100%)',
+                    transform: 'translateY(-1px)'
+                  }
                 }}
               >
                 Preview
@@ -629,22 +632,30 @@ ${video.description || 'No description available'}
             {/* Telegram button */}
             {telegramUsername && (
               <Tooltip title="Contact on Telegram" arrow>
-                <IconButton
+                <Button
+                  variant="contained"
                   size="small"
                   onClick={handleTelegramClick}
+                  startIcon={<TelegramIcon sx={{ fontSize: 18 }} />}
                   sx={{
-                    backgroundColor: 'rgba(0, 136, 204, 0.9)',
-                    color: 'white',
-                    width: { xs: 44, md: 36 },
-                    height: { xs: 44, md: 36 },
+                    background: 'linear-gradient(90deg, #6A00FF 0%, #9B00FF 100%)',
+                    color: '#ffffff',
+                    fontWeight: 900,
+                    letterSpacing: 0.2,
+                    fontSize: { xs: '0.9rem', md: '0.8rem' },
+                    minWidth: { xs: 120, md: 'auto' },
+                    px: { xs: 2, md: 1.6 },
+                    py: { xs: 0.7, md: 0.6 },
+                    borderRadius: 1.5,
+                    boxShadow: '0 6px 14px rgba(107, 0, 255, 0.25)',
                     '&:hover': {
-                      backgroundColor: 'rgba(0, 136, 204, 1)',
-                      transform: 'scale(1.05)',
-                    },
+                      background: 'linear-gradient(90deg, #5E00E6 0%, #8C00E6 100%)',
+                      transform: 'translateY(-1px)'
+                    }
                   }}
                 >
-                  <TelegramIcon sx={{ fontSize: 18 }} />
-                </IconButton>
+                  Telegram
+                </Button>
               </Tooltip>
             )}
           </Box>

@@ -308,7 +308,7 @@ const Home: FC = () => {
     if (telegramUsername) {
       // Create special offer message for Telegram
       const specialOfferMessage = `
-Hey! Saw your $90 deal for everything 🔥
+Hey! Saw your $85 deal for everything 🔥
 
 I want in! How do I pay?
 
@@ -405,7 +405,7 @@ Thanks!
             textShadow: '0 3px 6px rgba(0,0,0,0.3)',
             fontSize: { xs: '1.5rem', md: '2rem' }
           }}>
-            ALL CONTENT FOR ONLY $90
+            ALL CONTENT FOR ONLY $85
           </Typography>
           <Typography variant="h6" sx={{ 
             mb: 2, 
@@ -458,7 +458,7 @@ Thanks!
                 backdropFilter: 'blur(10px)',
               }}
             >
-              🚀 Come to Telegram to Pay 
+              🚀 Come to Negociate 
             </Button>
           )}
         </Box>
