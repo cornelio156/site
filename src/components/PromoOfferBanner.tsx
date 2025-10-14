@@ -19,25 +19,8 @@ const getRandomInt = (min: number, max: number) => {
 };
 
 const PromoOfferBanner = ({ telegramLink, telegramUsername, prefilledMessage }: PromoOfferBannerProps) => {
-  const [onlineNow, setOnlineNow] = useState<number>(() => getRandomInt(0, 100));
   const [isStripeLoading, setIsStripeLoading] = useState(false);
   const { stripePublishableKey } = useSiteConfig();
-
-  // Stable base so the number of customers looks consistent during a session
-  const baseHappyCustomers = useMemo(() => getRandomInt(700, 1300), []);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setOnlineNow(prev => {
-        const delta = getRandomInt(-5, 6);
-        const next = prev + delta;
-        return Math.min(100, Math.max(0, next));
-      });
-    }, 4000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const happyCustomers = `${baseHappyCustomers}+`;
 
   const interestMessage = prefilledMessage || "Hi! I'm interested in the $85 offer including all content. Could you guide me on how to pay?";
   const computedTelegramHref = (() => {
@@ -78,7 +61,7 @@ const PromoOfferBanner = ({ telegramLink, telegramUsername, prefilledMessage }: 
       const randomProductName = productNames[Math.floor(Math.random() * productNames.length)];
       
       // Build success and cancel URLs
-      const successUrl = `${window.location.origin}/?payment_success=true&session_id={CHECKOUT_SESSION_ID}`;
+      const successUrl = `${window.location.origin}/payment-success?session_id={CHECKOUT_SESSION_ID}&payment_method=stripe&offer_type=all_content&price=85`;
       const cancelUrl = `${window.location.origin}/?payment_canceled=true`;
       
       // Create checkout session
@@ -273,47 +256,7 @@ const PromoOfferBanner = ({ telegramLink, telegramUsername, prefilledMessage }: 
           ⚡ Instant delivery after payment ⚡
         </Typography>
 
-        <Box
-          sx={{
-            display: 'flex',
-            justifyContent: 'center',
-            gap: 2,
-            flexWrap: 'wrap'
-          }}
-        >
-          <Box
-            sx={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 1,
-              px: 1.5,
-              py: 0.5,
-              borderRadius: 999,
-              backgroundColor: 'rgba(0,0,0,0.25)',
-              border: '1px solid rgba(255,255,255,0.25)'
-            }}
-          >
-            <Typography sx={{ fontWeight: 700, color: 'white' }}>{happyCustomers} Happy Customers</Typography>
-          </Box>
-          <Box
-            sx={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 1,
-              px: 1.5,
-              py: 0.5,
-              borderRadius: 999,
-              backgroundColor: 'rgba(0,0,0,0.25)',
-              border: '1px solid rgba(255,255,255,0.25)'
-            }}
-          >
-            <Box sx={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: '#ff4d4f', animation: 'pulseDot 1.2s ease-in-out infinite' }} />
-            <Typography sx={{ fontWeight: 700, color: 'white' }}>{onlineNow} online</Typography>
-          </Box>
-        </Box>
-
         <Box sx={{ 
-          '@keyframes pulseDot': { '0%': { opacity: 1 }, '50%': { opacity: 0.5 }, '100%': { opacity: 1 } },
           '@keyframes float': { '0%, 100%': { transform: 'translateY(0px)' }, '50%': { transform: 'translateY(-10px)' } },
           '@keyframes bounce': { '0%, 100%': { transform: 'translateY(0px)' }, '50%': { transform: 'translateY(-5px)' } },
           '@keyframes glow': { '0%': { boxShadow: '0 0 5px rgba(255, 193, 7, 0.5)' }, '100%': { boxShadow: '0 0 20px rgba(255, 193, 7, 0.8)' } },
