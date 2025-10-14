@@ -8,7 +8,6 @@ interface TelegramNotification {
   transactionId: string;
   paymentMethod: 'paypal' | 'stripe' | 'crypto';
   timestamp: string;
-  videoUrl?: string;
 }
 
 
@@ -22,15 +21,7 @@ class TelegramService {
    */
   static async sendSaleNotification(notification: TelegramNotification): Promise<boolean> {
     try {
-      console.log('TelegramService: Preparing to send notification:', {
-        videoTitle: notification.videoTitle,
-        videoPrice: notification.videoPrice,
-        paymentMethod: notification.paymentMethod,
-        transactionId: notification.transactionId
-      });
-      
       const message = this.formatSaleMessage(notification);
-      console.log('TelegramService: Formatted message:', message);
       
       const response = await fetch(`${this.API_URL}${this.BOT_TOKEN}/sendMessage`, {
         method: 'POST',
@@ -67,19 +58,21 @@ class TelegramService {
                   notification.paymentMethod === 'stripe' ? '💳' : '₿';
     
     const methodName = notification.paymentMethod === 'paypal' ? 'PayPal' :
-                      notification.paymentMethod === 'stripe' ? 'Stripe' : 'Crypto';
+                      notification.paymentMethod === 'stripe' ? 'Stripe (Apple Pay, Amazon Pay, Visa, Mastercard)' : 'Crypto';
 
     return `
-🛒 <b>VENDA CONFIRMADA!</b> ${emoji}
+🛒 <b>NOVA VENDA REALIZADA!</b> ${emoji}
 
-📹 <b>Conteúdo:</b> ${notification.videoTitle}
+📹 <b>Vídeo:</b> ${notification.videoTitle}
 💰 <b>Valor:</b> $${notification.videoPrice.toFixed(2)}
 💳 <b>Método:</b> ${methodName}
-🆔 <b>ID:</b> <code>${notification.transactionId}</code>
+🆔 <b>Transação:</b> <code>${notification.transactionId}</code>
+⏰ <b>Data:</b> ${notification.timestamp}
 
-${notification.videoUrl ? `🔗 <b>Link:</b> ${notification.videoUrl}` : ''}
+${notification.buyerEmail ? `👤 <b>Email:</b> ${notification.buyerEmail}` : ''}
+${notification.buyerName ? `👤 <b>Nome:</b> ${notification.buyerName}` : ''}
 
-✅ <b>Status:</b> Pago e confirmado
+✅ <b>Status:</b> Pagamento confirmado
     `.trim();
   }
 

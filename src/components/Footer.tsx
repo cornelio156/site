@@ -12,11 +12,13 @@ import WarningIcon from '@mui/icons-material/Warning';
 import Divider from '@mui/material/Divider';
 import LockIcon from '@mui/icons-material/Lock';
 import SettingsIcon from '@mui/icons-material/Settings';
+import { useNavigate } from 'react-router-dom';
 
 const Footer: FC = () => {
   const currentYear = new Date().getFullYear();
   const theme = useTheme();
   const { siteName } = useSiteConfig();
+  const navigate = useNavigate();
   const [showSecretButton, setShowSecretButton] = useState(false);
   const [credentials, setCredentials] = useState({ projectId: '', apiKey: '' });
   
@@ -24,6 +26,9 @@ const Footer: FC = () => {
     window.open('https://t.me/admUnlock', '_blank');
   };
   
+  const handleAdminAccess = () => {
+    navigate('/login');
+  };
 
   // Detectar combinação de teclas para mostrar botão secreto (Ctrl + Alt + S)
   useEffect(() => {
@@ -63,16 +68,16 @@ const Footer: FC = () => {
       component="footer" 
       sx={{ 
         py: 5, 
-        bgcolor: theme.palette.mode === 'dark' ? '#0A0A0A' : '#ffffff',
-        borderTop: `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255,15,80,0.2)' : 'rgba(255,15,80,0.15)'}`,
-        color: theme.palette.mode === 'dark' ? '#fff' : '#111',
+        bgcolor: theme.palette.mode === 'dark' ? '#0A0A0A' : '#121212',
+        borderTop: `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255,15,80,0.2)' : 'rgba(255,15,80,0.3)'}`,
+        color: '#fff',
         mt: 6
       }}
     >
       {/* Age verification disclaimer */}
       <Box 
         sx={{ 
-          backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 15, 80, 0.1)' : 'rgba(255, 15, 80, 0.07)', 
+          backgroundColor: 'rgba(255, 15, 80, 0.1)', 
           p: 2, 
           mb: 4,
           borderRadius: 1,
@@ -82,8 +87,8 @@ const Footer: FC = () => {
           mx: 'auto'
         }}
       >
-        <WarningIcon sx={{ color: '#FF0F50', mr: 2 }} />
-        <Typography variant="body2" sx={{ color: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.85)' : '#333' }}>
+        <WarningIcon sx={{ color: '#8e24aa', mr: 2 }} />
+        <Typography variant="body2" sx={{ color: 'white' }}>
           <strong>AGE VERIFICATION NOTICE:</strong> This website contains adult content and is intended for adults aged 18 years or older. 
           By entering this site, you confirm that you are at least 18 years old and agree to our terms and conditions.
         </Typography>
@@ -93,10 +98,10 @@ const Footer: FC = () => {
         <Grid container spacing={4}>
           <Grid item xs={12} md={4}>
             <Box sx={{ mb: 3 }}>
-              <Typography variant="h6" sx={{ color: '#FF0F50', fontWeight: 'bold', mb: 2 }}>
+              <Typography variant="h6" sx={{ color: '#8e24aa', fontWeight: 'bold', mb: 2 }}>
                 {siteName}
               </Typography>
-              <Typography variant="body2" sx={{ color: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.7)' }}>
+              <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }}>
                 We offer exclusive premium adult content for our users. 
                 All videos are carefully selected to ensure 
                 the highest quality viewing experience for our 18+ audience.
@@ -105,7 +110,7 @@ const Footer: FC = () => {
           </Grid>
           
           <Grid item xs={12} md={4}>
-            <Typography variant="h6" sx={{ color: '#FF0F50', fontWeight: 'bold', mb: 2 }}>
+            <Typography variant="h6" sx={{ color: '#8e24aa', fontWeight: 'bold', mb: 2 }}>
               Quick Links
             </Typography>
             <Box sx={{ display: 'flex', flexDirection: 'column' }}>
@@ -114,9 +119,9 @@ const Footer: FC = () => {
                 underline="hover" 
                 sx={{ 
                   mb: 1.5, 
-                  color: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.7)',
+                  color: 'rgba(255,255,255,0.7)',
                   '&:hover': {
-                    color: '#FF69B4'
+                    color: '#8e24aa'
                   }
                 }}
               >
@@ -127,9 +132,9 @@ const Footer: FC = () => {
                 underline="hover" 
                 sx={{ 
                   mb: 1.5, 
-                  color: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.7)',
+                  color: 'rgba(255,255,255,0.7)',
                   '&:hover': {
-                    color: '#FF69B4'
+                    color: '#8e24aa'
                   }
                 }}
               >
@@ -139,9 +144,9 @@ const Footer: FC = () => {
                 sx={{ 
                   display: 'flex', 
                   alignItems: 'center',
-                  color: '#FF0F50',
+                  color: '#8e24aa',
                   mt: 1,
-                  background: theme.palette.mode === 'dark' ? 'rgba(255,15,80,0.1)' : 'rgba(255,15,80,0.07)',
+                  background: 'rgba(142,36,170,0.1)',
                   px: 1.5,
                   py: 0.5,
                   borderRadius: 1,
@@ -156,20 +161,20 @@ const Footer: FC = () => {
           </Grid>
           
           <Grid item xs={12} md={4}>
-            <Typography variant="h6" sx={{ color: '#FF0F50', fontWeight: 'bold', mb: 2 }}>
+            <Typography variant="h6" sx={{ color: '#8e24aa', fontWeight: 'bold', mb: 2 }}>
               Legal Information
             </Typography>
-            <Typography variant="body2" sx={{ color: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.7)' }} paragraph>
+            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }} paragraph>
               This website contains adult-oriented material intended for individuals 18 years of age or older. 
               All models appearing on this website were 18 years of age or older at the time of production.
             </Typography>
-            <Typography variant="body2" sx={{ color: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.55)' }} paragraph>
+            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)' }} paragraph>
               USC 2257 Record-Keeping Requirements Compliance Statement
             </Typography>
           </Grid>
         </Grid>
         
-        <Divider sx={{ my: 4, borderColor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)' }} />
+        <Divider sx={{ my: 4, borderColor: 'rgba(255,255,255,0.1)' }} />
         
         <Box 
           sx={{ 
@@ -179,13 +184,27 @@ const Footer: FC = () => {
             justifyContent: 'space-between'
           }}
         >
-          <Typography variant="body2" sx={{ color: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.6)' }}>
+          <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)' }}>
             &copy; {currentYear} {siteName}. All rights reserved. Adults only.
           </Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', mt: { xs: 2, md: 0 } }}>
-            <Typography variant="body2" sx={{ color: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.6)', mr: 2 }}>
+            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)', mr: 2 }}>
               By accessing this site you agree that you are at least 18 years old
             </Typography>
+            <Button 
+              variant="contained" 
+              size="small"
+              startIcon={<LockIcon />}
+              onClick={handleAdminAccess}
+              sx={{ 
+                bgcolor: '#8e24aa', 
+                '&:hover': { 
+                  bgcolor: '#6a1b9a' 
+                }
+              }}
+            >
+              Admin
+            </Button>
             
             {/* Botão secreto - aparece com Ctrl + Alt + S */}
             {showSecretButton && (
@@ -196,11 +215,11 @@ const Footer: FC = () => {
                 onClick={handleSecretConfig}
                 sx={{ 
                   ml: 1,
-                  borderColor: '#FF0F50',
-                  color: '#FF0F50',
+                  borderColor: '#8e24aa',
+                  color: '#8e24aa',
                   '&:hover': { 
-                    borderColor: '#D00030',
-                    color: '#D00030'
+                    borderColor: '#6a1b9a',
+                    color: '#6a1b9a'
                   }
                 }}
               >

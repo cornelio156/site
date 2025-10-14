@@ -11,7 +11,7 @@ interface ThemeContextType {
 }
 
 export const ThemeContext = createContext<ThemeContextType>({
-  mode: 'light',
+  mode: 'dark',
   toggleTheme: () => {},
 });
 
@@ -20,7 +20,7 @@ interface ThemeProviderProps {
 }
 
 export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
-  // Start with dark theme by default
+  // Always start with dark theme for adult content site
   const [mode, setMode] = useState<ThemeMode>('dark');
 
   useEffect(() => {
@@ -51,23 +51,22 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     palette: {
       mode,
       primary: {
-        main: '#FF0F50', // Vibrant red/pink for adult content
+        main: '#8e24aa', // Purple for adult content
       },
       secondary: {
-        main: '#9900CC', // Purple accent
+        main: '#6a1b9a', // Darker purple accent
       },
       background: {
-        default: mode === 'dark' ? '#0A0A0A' : '#ffffff', // White background for light mode
-        paper: mode === 'dark' ? '#121212' : '#ffffff',   // White cards for light mode
+        default: mode === 'dark' ? '#000000' : '#000000', // Pure black background
+        paper: mode === 'dark' ? '#1a1a1a' : '#1a1a1a',   // Dark cards
       },
       text: {
-        primary: mode === 'dark' ? '#FFFFFF' : '#000000', // Black text for light mode
-        secondary: mode === 'dark' ? '#FF69B4' : '#FF0F50', // Red for secondary text in light mode
+        primary: mode === 'dark' ? '#FFFFFF' : '#FFFFFF',
+        secondary: mode === 'dark' ? '#8e24aa' : '#8e24aa', // Purple for secondary text
       },
       error: {
         main: '#FF0000', // Pure red for errors
       },
-      divider: mode === 'dark' ? 'rgba(255, 15, 80, 0.2)' : 'rgba(255, 15, 80, 0.3)',
     },
     typography: {
       fontFamily: '"Montserrat", "Roboto", "Helvetica", "Arial", sans-serif',
@@ -99,9 +98,9 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
             transition: 'all 0.3s ease',
           },
           containedPrimary: {
-            backgroundColor: '#FF0F50',
+            backgroundColor: '#8e24aa',
             '&:hover': {
-              backgroundColor: '#D10D42',
+              backgroundColor: '#6a1b9a',
               transform: 'scale(1.03)',
             },
           },
@@ -123,7 +122,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
       MuiAppBar: {
         styleOverrides: {
           root: {
-            backgroundColor: mode === 'dark' ? '#121212' : '#ffffff',
+            backgroundColor: mode === 'dark' ? '#1a1a1a' : '#1a1a1a',
             boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)',
           },
         },
@@ -132,7 +131,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
         styleOverrides: {
           root: {
             '&:hover': {
-              backgroundColor: 'rgba(255, 15, 80, 0.1)',
+              backgroundColor: 'rgba(142, 36, 170, 0.1)',
             }
           }
         }
@@ -144,54 +143,6 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     <ThemeContext.Provider value={{ mode, toggleTheme }}>
       <MuiThemeProvider theme={theme}>
         <CssBaseline />
-        <style>
-          {`
-            body {
-              background-color: ${mode === 'dark' ? '#0A0A0A' : '#ffffff'} !important;
-              color: ${mode === 'dark' ? '#FFFFFF' : '#000000'} !important;
-            }
-            
-            .light-theme {
-              background-color: #ffffff !important;
-              color: #000000 !important;
-            }
-            
-            .dark-theme {
-              background-color: #0A0A0A !important;
-              color: #FFFFFF !important;
-            }
-            
-            /* Light mode specific styles */
-            .light-theme .MuiPaper-root {
-              background-color: #ffffff !important;
-              color: #000000 !important;
-            }
-            
-            .light-theme .MuiCard-root {
-              background-color: #ffffff !important;
-              color: #000000 !important;
-            }
-            
-            .light-theme .MuiContainer-root {
-              background-color: #ffffff !important;
-            }
-            
-            /* Dark mode specific styles */
-            .dark-theme .MuiPaper-root {
-              background-color: #121212 !important;
-              color: #FFFFFF !important;
-            }
-            
-            .dark-theme .MuiCard-root {
-              background-color: #121212 !important;
-              color: #FFFFFF !important;
-            }
-            
-            .dark-theme .MuiContainer-root {
-              background-color: #0A0A0A !important;
-            }
-          `}
-        </style>
         {children}
       </MuiThemeProvider>
     </ThemeContext.Provider>

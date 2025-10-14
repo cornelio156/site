@@ -55,35 +55,6 @@ const TelegramTest: React.FC = () => {
     }
   };
 
-  const testStripeNotification = async () => {
-    setTesting(true);
-    setResult(null);
-    
-    try {
-      const success = await TelegramService.sendSaleNotification({
-        videoTitle: 'Teste de Notificação Stripe',
-        videoPrice: 29.99,
-        buyerEmail: undefined,
-        buyerName: undefined,
-        transactionId: 'stripe_test_' + Date.now(),
-        paymentMethod: 'stripe',
-        timestamp: new Date().toLocaleString('pt-BR')
-      });
-      
-      setResult({
-        success,
-        message: success ? 'Notificação Stripe de teste enviada!' : 'Falha ao enviar notificação Stripe'
-      });
-    } catch (error) {
-      setResult({
-        success: false,
-        message: `Erro: ${error}`
-      });
-    } finally {
-      setTesting(false);
-    }
-  };
-
   return (
     <Box sx={{ p: 3, maxWidth: 500, mx: 'auto' }}>
       <Typography variant="h5" gutterBottom>
@@ -94,7 +65,7 @@ const TelegramTest: React.FC = () => {
         Use estes botões para testar a conexão e envio de notificações do Telegram Bot.
       </Typography>
 
-      <Box sx={{ display: 'flex', gap: 2, mb: 3, flexWrap: 'wrap' }}>
+      <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
         <Button
           variant="contained"
           onClick={testConnection}
@@ -110,17 +81,7 @@ const TelegramTest: React.FC = () => {
           disabled={testing}
           startIcon={testing ? <CircularProgress size={20} /> : null}
         >
-          Testar PayPal
-        </Button>
-        
-        <Button
-          variant="outlined"
-          color="secondary"
-          onClick={testStripeNotification}
-          disabled={testing}
-          startIcon={testing ? <CircularProgress size={20} /> : null}
-        >
-          Testar Stripe
+          Enviar Notificação de Teste
         </Button>
       </Box>
 

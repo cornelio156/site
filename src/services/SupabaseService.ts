@@ -1,282 +1,202 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { getSupabaseConfig } from '../config/supabase';
 
-interface SupabaseConfig {
-  url: string;
-  anonKey: string;
+export interface SupabaseVideoRow {
+  id: string;
+  title: string;
+  description: string | null;
+  price: number;
+  duration: string | null;
+  video_file_id: string | null;
+  thumbnail_file_id: string | null;
+  thumbnail_url: string | null;
+  product_link: string | null;
+  is_active: boolean;
+  views: number;
+  created_at: string;
 }
 
-class SupabaseService {
-  private static instance: SupabaseService;
-  private client: SupabaseClient | null = null;
-  private config: SupabaseConfig | null = null;
-  private isInitialized = false;
+export class SupabaseService {
+  private static client: SupabaseClient | null = null;
 
-  private constructor() {}
-
-  static getInstance(): SupabaseService {
-    if (!SupabaseService.instance) {
-      SupabaseService.instance = new SupabaseService();
-    }
-    return SupabaseService.instance;
+  static isConfigured(): boolean {
+    return !!(import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY);
   }
 
-  async initialize(): Promise<void> {
-    if (this.isInitialized) {
-      return;
-    }
-
-    try {
-      // Obter configuração do Supabase
-      const config = getSupabaseConfig();
-      this.config = {
-        url: config.url,
-        anonKey: config.anonKey
-      };
-
-      this.client = createClient(this.config.url, this.config.anonKey);
-      
-      // Testar conexão
-      const { data, error } = await this.client.from('videos').select('count').limit(1);
-      
-      if (error) {
-        console.error('Erro ao conectar com Supabase:', error);
-        throw new Error(`Falha na conexão com Supabase: ${error.message}`);
-      }
-
-      this.isInitialized = true;
-      console.log('Supabase inicializado com sucesso');
-    } catch (error) {
-      console.error('Erro ao inicializar Supabase:', error);
-      throw error;
-    }
-  }
-
-  async checkInitialized(): Promise<void> {
-    if (!this.isInitialized || !this.client) {
-      await this.initialize();
-    }
-  }
-
-  getClient(): SupabaseClient {
+  private static getClient(): SupabaseClient {
     if (!this.client) {
-      throw new Error('Supabase não foi inicializado. Chame initialize() primeiro.');
+      const url = import.meta.env.VITE_SUPABASE_URL as string;
+      const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+      this.client = createClient(url, key, { auth: { persistSession: false } });
     }
-    return this.client;
+    return this.client!;
   }
 
-  // Métodos para vídeos
-  async getVideos(): Promise<any[]> {
-    await this.checkInitialized();
-    const { data, error } = await this.client!.from('videos').select('*').eq('is_active', true).order('created_at', { ascending: false });
-    
-    if (error) {
-      console.error('Erro ao buscar vídeos:', error);
-      throw error;
-    }
-    
+  // Videos
+  static async listVideos(): Promise<SupabaseVideoRow[]> {
+    const { data, error } = await this.getClient()
+      .from('videos')
+      .select('*')
+      .eq('is_active', true)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
     return data || [];
   }
 
-  async getVideo(id: string): Promise<any | null> {
-    await this.checkInitialized();
-    const { data, error } = await this.client!.from('videos').select('*').eq('id', id).eq('is_active', true).single();
-    
-    if (error) {
-      if (error.code === 'PGRST116') {
-        return null; // Vídeo não encontrado
-      }
-      console.error('Erro ao buscar vídeo:', error);
-      throw error;
-    }
-    
+  // Video sources (multiple files per video/title)
+  static async listVideoSources(videoId: string): Promise<Array<{ id: string; video_id: string; source_file_id: string; thumbnail_file_id: string | null; position: number }>> {
+    const { data, error } = await this.getClient()
+      .from('video_sources')
+      .select('id,video_id,source_file_id,thumbnail_file_id,position')
+      .eq('video_id', videoId)
+      .order('position', { ascending: true });
+    if (error) throw error;
+    return (data || []) as any;
+  }
+
+  static async addVideoSource(videoId: string, sourceFileId: string, thumbnailFileId?: string, position: number = 1) {
+    const { data, error } = await this.getClient()
+      .from('video_sources')
+      .insert({ video_id: videoId, source_file_id: sourceFileId, thumbnail_file_id: thumbnailFileId || null, position })
+      .select('*')
+      .single();
+    if (error) throw error;
     return data;
   }
 
-  async incrementVideoViews(id: string): Promise<void> {
-    await this.checkInitialized();
-    
-    try {
-      // Primeiro, buscar o vídeo atual para obter o número de views
-      const { data: video, error: fetchError } = await this.client!
-        .from('videos')
-        .select('views')
-        .eq('id', id)
-        .single();
-      
-      if (fetchError) {
-        console.error('Erro ao buscar vídeo para incrementar views:', fetchError);
-        return;
-      }
-      
-      // Incrementar as views
-      const currentViews = video?.views || 0;
-      const { error: updateError } = await this.client!
-        .from('videos')
-        .update({ views: currentViews + 1 })
-        .eq('id', id);
-      
-      if (updateError) {
-        console.error('Erro ao incrementar views:', updateError);
-      }
-    } catch (error) {
-      console.error('Erro ao incrementar views:', error);
-    }
-  }
-
-  // Métodos para usuários
-  async getUserByEmail(email: string): Promise<any | null> {
-    await this.checkInitialized();
-    const { data, error } = await this.client!.from('users').select('*').eq('email', email).single();
-    
-    if (error) {
-      if (error.code === 'PGRST116') {
-        return null; // Usuário não encontrado
-      }
-      console.error('Erro ao buscar usuário:', error);
-      throw error;
-    }
-    
+  static async updateVideoSource(id: string, updates: Partial<{ source_file_id: string; thumbnail_file_id: string | null; position: number }>) {
+    const { data, error } = await this.getClient()
+      .from('video_sources')
+      .update(updates)
+      .eq('id', id)
+      .select('*')
+      .single();
+    if (error) throw error;
     return data;
   }
 
-  async getUserById(id: string): Promise<any | null> {
-    await this.checkInitialized();
-    const { data, error } = await this.client!.from('users').select('*').eq('id', id).single();
-    
-    if (error) {
-      if (error.code === 'PGRST116') {
-        return null; // Usuário não encontrado
-      }
-      console.error('Erro ao buscar usuário por ID:', error);
-      throw error;
-    }
-    
-    return data;
-  }
-
-  async createUser(userData: any): Promise<any> {
-    await this.checkInitialized();
-    
-    // Generate a unique ID if not provided
-    const userWithId = {
-      id: userData.id || this.generateId(),
-      ...userData
-    };
-    
-    const { data, error } = await this.client!.from('users').insert(userWithId).select().single();
-    
-    if (error) {
-      console.error('Erro ao criar usuário:', error);
-      throw error;
-    }
-    
-    return data;
-  }
-
-  // Generate a unique ID
-  private generateId(): string {
-    return 'user_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
-  }
-
-  // Métodos para sessões
-  async createSession(sessionData: any): Promise<any> {
-    await this.checkInitialized();
-    const { data, error } = await this.client!.from('sessions').insert(sessionData).select().single();
-    
-    if (error) {
-      console.error('Erro ao criar sessão:', error);
-      throw error;
-    }
-    
-    return data;
-  }
-
-  async getSessionByToken(token: string): Promise<any | null> {
-    await this.checkInitialized();
-    const { data, error } = await this.client!.from('sessions').select('*').eq('token', token).eq('is_active', true).single();
-    
-    if (error) {
-      if (error.code === 'PGRST116') {
-        return null; // Sessão não encontrada
-      }
-      console.error('Erro ao buscar sessão:', error);
-      throw error;
-    }
-    
-    return data;
-  }
-
-  async updateSession(id: string, updates: any): Promise<void> {
-    await this.checkInitialized();
-    const { error } = await this.client!.from('sessions').update(updates).eq('id', id);
-    
-    if (error) {
-      console.error('Erro ao atualizar sessão:', error);
-      throw error;
-    }
-  }
-
-  async deleteSession(id: string): Promise<void> {
-    await this.checkInitialized();
-    const { error } = await this.client!.from('sessions').delete().eq('id', id);
-    
-    if (error) {
-      console.error('Erro ao deletar sessão:', error);
-      throw error;
-    }
-  }
-
-  async deleteUser(id: string): Promise<boolean> {
-    await this.checkInitialized();
-    const { error } = await this.client!.from('users').delete().eq('id', id);
-    
-    if (error) {
-      console.error('Erro ao deletar usuário:', error);
-      return false;
-    }
-    
+  static async deleteVideoSource(id: string) {
+    const { error } = await this.getClient()
+      .from('video_sources')
+      .delete()
+      .eq('id', id);
+    if (error) throw error;
     return true;
   }
 
-  // Métodos para configuração do site
-  async getSiteConfig(): Promise<any | null> {
-    await this.checkInitialized();
-    const { data, error } = await this.client!.from('site_config').select('*').order('id', { ascending: false }).limit(1).single();
-    
-    if (error) {
-      if (error.code === 'PGRST116') {
-        return null; // Configuração não encontrada
-      }
-      console.error('Erro ao buscar configuração do site:', error);
-      throw error;
-    }
-    
-    return data;
+  static async getVideo(id: string): Promise<SupabaseVideoRow | null> {
+    const { data, error } = await this.getClient()
+      .from('videos')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+    if (error) throw error;
+    return data ?? null;
   }
 
-  async updateSiteConfig(configData: any): Promise<void> {
-    await this.checkInitialized();
-    const { error } = await this.client!.from('site_config').upsert(configData);
-    
+  static async incrementViews(id: string): Promise<void> {
+    const { error } = await this.getClient()
+      .rpc('increment', { table_name: 'videos', row_id: id, column_name: 'views' });
+    // Fallback if RPC not created
     if (error) {
-      console.error('Erro ao atualizar configuração do site:', error);
-      throw error;
+      await this.getClient()
+        .from('videos')
+        .update({ views: (await this.getVideo(id))?.views! + 1 })
+        .eq('id', id);
     }
   }
 
-  // Métodos para carteiras crypto
-  async getCryptoWallets(): Promise<any[]> {
-    await this.checkInitialized();
-    const { data, error } = await this.client!.from('crypto_wallets').select('*').order('created_at', { ascending: false });
-    
-    if (error) {
-      console.error('Erro ao buscar carteiras crypto:', error);
-      throw error;
+  static async createVideo(payload: Partial<SupabaseVideoRow>): Promise<SupabaseVideoRow> {
+    const { data, error } = await this.getClient()
+      .from('videos')
+      .insert(payload)
+      .select('*')
+      .single();
+    if (error) throw error;
+    return data as SupabaseVideoRow;
+  }
+
+  static async updateVideo(id: string, updates: Partial<SupabaseVideoRow>): Promise<SupabaseVideoRow> {
+    const { data, error } = await this.getClient()
+      .from('videos')
+      .update(updates)
+      .eq('id', id)
+      .select('*')
+      .single();
+    if (error) throw error;
+    return data as SupabaseVideoRow;
+  }
+
+  static async deleteVideo(id: string): Promise<boolean> {
+    const { error } = await this.getClient().from('videos').delete().eq('id', id);
+    if (error) throw error;
+    return true;
+  }
+
+  // Relations
+  static async getRelatedVideoIds(videoId: string): Promise<string[]> {
+    const { data, error } = await this.getClient()
+      .from('video_relations')
+      .select('related_video_id')
+      .eq('video_id', videoId);
+    if (error) throw error;
+    return (data || []).map(r => r.related_video_id);
+  }
+
+  static async setRelatedVideos(videoId: string, relatedIds: string[]): Promise<void> {
+    const client = this.getClient();
+    // Remove existing
+    const { error: delErr } = await client.from('video_relations').delete().eq('video_id', videoId);
+    if (delErr) throw delErr;
+    if (relatedIds.length === 0) return;
+    const rows = relatedIds.map(id => ({ video_id: videoId, related_video_id: id }));
+    const { error } = await client.from('video_relations').insert(rows);
+    if (error) throw error;
+  }
+
+  // Site config
+  static async getSiteConfig(): Promise<any | null> {
+    const { data, error } = await this.getClient()
+      .from('site_config')
+      .select('*')
+      .limit(1)
+      .maybeSingle();
+    if (error) throw error;
+    return data ?? null;
+  }
+
+  static async updateSiteConfig(updates: any): Promise<void> {
+    const client = this.getClient();
+    const existing = await this.getSiteConfig();
+    if (existing) {
+      const { error } = await client.from('site_config').update({ ...updates, updated_at: new Date().toISOString() }).eq('id', existing.id);
+      if (error) throw error;
+    } else {
+      const { error } = await client.from('site_config').insert({ ...updates, updated_at: new Date().toISOString() });
+      if (error) throw error;
     }
-    
+  }
+
+  // Users (admin)
+  static async listUsers(): Promise<any[]> {
+    const { data, error } = await this.getClient().from('users').select('id,email,name,role,created_at').order('created_at', { ascending: false });
+    if (error) throw error;
     return data || [];
+  }
+
+  static async createUser(user: { email: string; name: string; role?: 'admin' | 'editor'; password_hash: string; }): Promise<void> {
+    const { error } = await this.getClient().from('users').insert({ ...user, role: user.role || 'admin' });
+    if (error) throw error;
+  }
+
+  static async updateUser(id: string, updates: Partial<{ email: string; name: string; role: 'admin'|'editor'; password_hash: string; }>): Promise<void> {
+    const { error } = await this.getClient().from('users').update(updates).eq('id', id);
+    if (error) throw error;
+  }
+
+  static async deleteUser(id: string): Promise<void> {
+    const { error } = await this.getClient().from('users').delete().eq('id', id);
+    if (error) throw error;
   }
 }
 
-export default SupabaseService;
+

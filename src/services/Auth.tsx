@@ -1,9 +1,7 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import type { FC, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { jsonDatabaseService, UserData, SessionData } from './JSONDatabaseService';
-import { UserServiceSupabase } from './UserServiceSupabase';
-import { MIGRATION_CONFIG } from './MigrationService';
+import type { SessionData } from './JSONDatabaseService';
 
 // Define user type - mantém compatibilidade com o frontend
 interface User {
@@ -71,37 +69,60 @@ export const AuthProvider: FC<AuthProviderProps> = ({ children }) => {
     return () => clearInterval(intervalId);
   }, []);
 
-  // Login function using Supabase only
+  // Helper: server API base
+  const API_BASE_URL = import.meta.env.DEV ? 'http://localhost:3000' : (import.meta.env.VITE_API_URL || '');
+
+  // Login function using Supabase-backed API
   const login = async (email: string, password: string, redirectPath?: string) => {
     try {
       setLoading(true);
       setError(null);
       
-      // Use Supabase only - no fallback
-      if (MIGRATION_CONFIG.useSupabaseForUsers) {
-        console.log('Attempting login with Supabase');
-        const result = await UserServiceSupabase.login(email, password);
-        
-        if (result) {
-          setUser(result.user);
-          setIsAuthenticated(true);
-          setCurrentSession(result.session);
-          setSessionCheckedAt(Date.now());
-          
-          // Redirect after login if path is provided
-          if (redirectPath) {
-            navigate(redirectPath);
-          } else {
-            navigate('/admin');
-          }
-          return;
-        } else {
-          setError('Usuário não encontrado ou senha inválida.');
-          return;
-        }
+      // Fetch user from server (Supabase-backed)
+      const userResp = await fetch(`${API_BASE_URL}/api/users/email/${encodeURIComponent(email)}`);
+      const userData = userResp.ok ? await userResp.json() : null;
+      
+      if (!userData) {
+        setError('Usuário não encontrado. Verifique suas credenciais.');
+        return;
       }
       
-      throw new Error('Supabase is required for user authentication');
+      // Verify password hash using SHA256
+      const hashedPassword = await hashPasswordWithWebCrypto(password);
+      
+      const storedHash: string = userData.password_hash || userData.password || '';
+      if (hashedPassword !== storedHash) {
+        setError('Senha inválida. Tente novamente.');
+        return;
+      }
+      
+      // Create a new session for this user
+      const session = await createSession(userData.id);
+      
+      if (!session) {
+        setError('Falha ao criar sessão. Tente novamente.');
+        return;
+      }
+      
+      // Convert UserData to User for compatibility
+      const user: User = {
+        $id: userData.id,
+        email: userData.email,
+        name: userData.name,
+        password: userData.password_hash || userData.password || '',
+        created_at: userData.created_at || userData.createdAt
+      };
+      
+      // Store user data and session in state
+      setUser(user);
+      setIsAuthenticated(true);
+      setCurrentSession(session);
+      setSessionCheckedAt(Date.now());
+      
+      // Redirect after login if path is provided
+      if (redirectPath) {
+        navigate(redirectPath, { replace: true });
+      }
       
     } catch (err) {
       console.error('Login error:', err);
@@ -111,7 +132,7 @@ export const AuthProvider: FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  // Create a new session for a user
+  // Create a new session for a user (via API -> Supabase)
   const createSession = async (userId: string): Promise<SessionData | null> => {
     try {
       // Generate a unique session token
@@ -122,16 +143,21 @@ export const AuthProvider: FC<AuthProviderProps> = ({ children }) => {
       expiresAt.setHours(expiresAt.getHours() + 24);
       
       // Session data
-      const sessionData: Omit<SessionData, 'id' | 'createdAt'> = {
+      const sessionPayload = {
         userId,
         token,
         userAgent: navigator.userAgent.substring(0, 255),
         expiresAt: expiresAt.toISOString(),
         isActive: true,
-      };
+      } as any;
       
-      // Create session in JSON database
-      const session = await jsonDatabaseService.createSession(sessionData);
+      // Create session via API
+      const resp = await fetch(`${API_BASE_URL}/api/sessions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(sessionPayload)
+      });
+      const session = resp.ok ? await resp.json() : null;
       
       // Store session token in local storage
       localStorage.setItem('sessionToken', token);
@@ -148,11 +174,15 @@ export const AuthProvider: FC<AuthProviderProps> = ({ children }) => {
     try {
       setLoading(true);
       
-      // Use Supabase only - no fallback
-      if (MIGRATION_CONFIG.useSupabaseForUsers) {
-        await UserServiceSupabase.logout();
+      // If we have a session, deactivate it
+      if (currentSession) {
+        await deactivateSession(currentSession.id);
       } else {
-        throw new Error('Supabase is required for user authentication');
+        // If no session in state, try to get current session
+        const session = await getCurrentSession();
+        if (session) {
+          await deactivateSession(session.id);
+        }
       }
       
       // Clear user data
@@ -179,7 +209,11 @@ export const AuthProvider: FC<AuthProviderProps> = ({ children }) => {
   // Deactivate a session
   const deactivateSession = async (sessionId: string): Promise<void> => {
     try {
-      await jsonDatabaseService.updateSession(sessionId, { isActive: false });
+      await fetch(`${API_BASE_URL}/api/sessions/${encodeURIComponent(sessionId)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isActive: false })
+      });
       
       // Remove session token from local storage
       localStorage.removeItem('sessionToken');
@@ -204,8 +238,9 @@ export const AuthProvider: FC<AuthProviderProps> = ({ children }) => {
     try {
       console.log('Validating session with token:', token.substring(0, 10) + '...');
       
-      // Get session from JSON database
-      const session = await jsonDatabaseService.getSessionByToken(token);
+      // Get session from server (Supabase)
+      const resp = await fetch(`${API_BASE_URL}/api/sessions/token/${encodeURIComponent(token)}`);
+      const session = resp.ok ? await resp.json() : null;
       
       if (!session) {
         console.log('No session found with this token');
@@ -251,39 +286,53 @@ export const AuthProvider: FC<AuthProviderProps> = ({ children }) => {
       
       setLoading(true);
       
-      // Use Supabase only - no fallback
-      if (MIGRATION_CONFIG.useSupabaseForUsers) {
-        console.log('Checking session with Supabase');
-        const session = await UserServiceSupabase.getCurrentSession();
-        setCurrentSession(session);
-        setSessionCheckedAt(now);
+      // Get current session
+      const session = await getCurrentSession();
+      setCurrentSession(session);
+      setSessionCheckedAt(now);
+      
+      if (!session) {
+        // No valid session found
+        setUser(null);
+        setIsAuthenticated(false);
+        return;
+      }
+      
+      // Fetch user data from server using the session's userId
+      try {
+        const userResp = await fetch(`${API_BASE_URL}/api/users/${encodeURIComponent(session.userId)}`);
+        const userData = userResp.ok ? await userResp.json() : null;
         
-        if (!session) {
-          // No valid session found
-          setUser(null);
-          setIsAuthenticated(false);
-          return;
-        }
-        
-        // Get user data from Supabase
-        const user = await UserServiceSupabase.getUserById(session.userId);
-        
-        if (!user) {
+        if (!userData) {
           // User not found, deactivate session
-          await UserServiceSupabase.deactivateSession(session.id);
+          await deactivateSession(session.id);
           setUser(null);
           setIsAuthenticated(false);
           setCurrentSession(null);
           return;
         }
         
+        // Convert UserData to User for compatibility
+        const user: User = {
+          $id: userData.id,
+          email: userData.email,
+          name: userData.name,
+          password: userData.password_hash || userData.password || '',
+          created_at: userData.created_at || userData.createdAt
+        };
+        
         setUser(user);
         setIsAuthenticated(true);
-        return;
+      } catch (err) {
+        // Error fetching user or user not found
+        console.error('Error fetching user data:', err);
+        setUser(null);
+        setIsAuthenticated(false);
+        
+        // Deactivate invalid session
+        await deactivateSession(session.id);
+        setCurrentSession(null);
       }
-      
-      throw new Error('Supabase is required for user authentication');
-      
     } catch (err) {
       // Error checking session
       console.error('Session check error:', err);

@@ -1,4 +1,4 @@
-// API Routes para o servidor - Supabase para metadados, Wasabi para arquivos
+// API Routes para o servidor SQLite
 import express from 'express';
 import { promises as fs } from 'fs';
 import path from 'path';
@@ -7,7 +7,24 @@ import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } fro
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import multer from 'multer';
 import Stripe from 'stripe';
-import { wasabiBackendService } from './server/services/WasabiBackendService.js';
+import { createClient } from '@supabase/supabase-js';
+import dotenv from 'dotenv';
+
+// Forçar leitura do .env
+dotenv.config();
+
+// Supabase server client
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+const SUPABASE_SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+const supabase = SUPABASE_URL && SUPABASE_SERVICE_ROLE ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE, { auth: { persistSession: false } }) : null;
+
+function requireSupabase(res) {
+  if (!supabase) {
+    res.status(500).json({ error: 'Supabase not configured on server' });
+    return false;
+  }
+  return true;
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -23,6 +40,30 @@ const VIDEOS_FILE = path.join(DATA_DIR, 'videos.json');
 const USERS_FILE = path.join(DATA_DIR, 'users.json');
 const SESSIONS_FILE = path.join(DATA_DIR, 'sessions.json');
 const SITE_CONFIG_FILE = path.join(DATA_DIR, 'site_config.json');
+// Helper: load Wasabi config from ENV first, then Supabase site_config
+async function getWasabiConfigFromServer() {
+  // ENV takes precedence
+  const envConfig = {
+    accessKey: process.env.WASABI_ACCESS_KEY || process.env.VITE_WASABI_ACCESS_KEY,
+    secretKey: process.env.WASABI_SECRET_KEY || process.env.VITE_WASABI_SECRET_KEY,
+    region: process.env.WASABI_REGION || process.env.VITE_WASABI_REGION,
+    bucket: process.env.WASABI_BUCKET || process.env.VITE_WASABI_BUCKET,
+    endpoint: process.env.WASABI_ENDPOINT || process.env.VITE_WASABI_ENDPOINT,
+  };
+  if (envConfig.accessKey && envConfig.secretKey && envConfig.bucket && envConfig.region && envConfig.endpoint) {
+    return envConfig;
+  }
+  // Fallback to Supabase site_config
+  if (!supabase) return null;
+  const { data: cfg, error: cfgErr } = await supabase.from('site_config').select('wasabi_config').limit(1).maybeSingle();
+  if (cfgErr) throw cfgErr;
+  const wasabiConfig = cfg?.wasabi_config || {};
+  if (wasabiConfig && wasabiConfig.accessKey && wasabiConfig.secretKey && wasabiConfig.bucket && wasabiConfig.region && wasabiConfig.endpoint) {
+    return wasabiConfig;
+  }
+  return null;
+}
+
 
 // Função para ler arquivo JSON
 async function readJsonFile(filePath, defaultValue = []) {
@@ -97,7 +138,9 @@ async function writeJsonFile(filePath, data) {
 // GET /api/videos/health - Verificar integridade dos dados
 router.get('/videos/health', async (req, res) => {
   try {
-    const videos = await wasabiBackendService.getAllVideos();
+    if (!requireSupabase(res)) return;
+    const { data: videos, error } = await supabase.from('videos').select('*');
+    if (error) throw error;
     
     // Verificar integridade básica
     const healthCheck = {
@@ -151,7 +194,13 @@ router.get('/videos/health', async (req, res) => {
 // GET /api/videos - Obter todos os vídeos
 router.get('/videos', async (req, res) => {
   try {
-    const videos = await wasabiBackendService.getAllVideos();
+    if (!requireSupabase(res)) return;
+    const { data: videos, error } = await supabase
+      .from('videos')
+      .select('*')
+      .eq('is_active', true)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
     res.json(videos);
   } catch (error) {
     console.error('Error fetching videos:', error);
@@ -162,7 +211,13 @@ router.get('/videos', async (req, res) => {
 // GET /api/videos/:id - Obter vídeo por ID
 router.get('/videos/:id', async (req, res) => {
   try {
-    const video = await wasabiBackendService.getVideo(req.params.id);
+    if (!requireSupabase(res)) return;
+    const { data: video, error } = await supabase
+      .from('videos')
+      .select('*')
+      .eq('id', req.params.id)
+      .maybeSingle();
+    if (error) throw error;
     
     if (!video) {
       return res.status(404).json({ error: 'Video not found' });
@@ -178,6 +233,7 @@ router.get('/videos/:id', async (req, res) => {
 // POST /api/videos - Criar novo vídeo
 router.post('/videos', async (req, res) => {
   try {
+    if (!requireSupabase(res)) return;
     const newVideo = req.body;
     
     // Validar campos obrigatórios
@@ -188,7 +244,21 @@ router.post('/videos', async (req, res) => {
       }
     }
     
-    const createdVideo = await wasabiBackendService.createVideo(newVideo);
+    const { data: createdVideo, error } = await supabase
+      .from('videos')
+      .insert({
+        title: newVideo.title,
+        description: newVideo.description,
+        price: newVideo.price,
+        duration: newVideo.duration || null,
+        video_file_id: newVideo.videoFileId || newVideo.video_id || null,
+        thumbnail_file_id: newVideo.thumbnailFileId || newVideo.thumbnail_id || null,
+        product_link: newVideo.productLink || null,
+        is_active: newVideo.isActive !== false,
+      })
+      .select('*')
+      .single();
+    if (error) throw error;
     
     console.log(`Video ${createdVideo.id} created successfully`);
     res.status(201).json(createdVideo);
@@ -201,6 +271,7 @@ router.post('/videos', async (req, res) => {
 // PUT /api/videos/:id - Atualizar vídeo
 router.put('/videos/:id', async (req, res) => {
   try {
+    if (!requireSupabase(res)) return;
     const updates = req.body;
     
     // Filtrar apenas campos válidos para atualização
@@ -217,7 +288,24 @@ router.put('/videos/:id', async (req, res) => {
       }
     }
     
-    const updatedVideo = await wasabiBackendService.updateVideo(req.params.id, validUpdates);
+    const supaUpdates = {
+      title: validUpdates.title,
+      description: validUpdates.description,
+      price: validUpdates.price,
+      duration: validUpdates.duration,
+      video_file_id: validUpdates.videoFileId,
+      thumbnail_file_id: validUpdates.thumbnailFileId,
+      product_link: validUpdates.productLink,
+      is_active: validUpdates.isActive,
+    };
+    Object.keys(supaUpdates).forEach(k => supaUpdates[k] === undefined && delete supaUpdates[k]);
+    const { data: updatedVideo, error } = await supabase
+      .from('videos')
+      .update(supaUpdates)
+      .eq('id', req.params.id)
+      .select('*')
+      .single();
+    if (error) throw error;
     
     if (!updatedVideo) {
       return res.status(404).json({ error: 'Video not found' });
@@ -234,7 +322,9 @@ router.put('/videos/:id', async (req, res) => {
 // DELETE /api/videos/:id - Deletar vídeo
 router.delete('/videos/:id', async (req, res) => {
   try {
-    const success = await wasabiBackendService.deleteVideo(req.params.id);
+    if (!requireSupabase(res)) return;
+    const { error } = await supabase.from('videos').delete().eq('id', req.params.id);
+    const success = !error;
     
     if (!success) {
       return res.status(404).json({ error: 'Video not found' });
@@ -250,8 +340,14 @@ router.delete('/videos/:id', async (req, res) => {
 // POST /api/videos/:id/views - Incrementar visualizações
 router.post('/videos/:id/views', async (req, res) => {
   try {
-    await wasabiBackendService.incrementVideoViews(req.params.id);
-    const video = await wasabiBackendService.getVideo(req.params.id);
+    if (!requireSupabase(res)) return;
+    // Try RPC first; fallback to update
+    const { error: rpcErr } = await supabase.rpc('increment', { table_name: 'videos', row_id: req.params.id, column_name: 'views' });
+    if (rpcErr) {
+      const { data: current } = await supabase.from('videos').select('views').eq('id', req.params.id).maybeSingle();
+      await supabase.from('videos').update({ views: (current?.views || 0) + 1 }).eq('id', req.params.id);
+    }
+    const { data: video } = await supabase.from('videos').select('views').eq('id', req.params.id).maybeSingle();
     
     if (!video) {
       return res.status(404).json({ error: 'Video not found' });
@@ -269,7 +365,9 @@ router.post('/videos/:id/views', async (req, res) => {
 // GET /api/users - Obter todos os usuários
 router.get('/users', async (req, res) => {
   try {
-    const users = await wasabiBackendService.getAllUsers();
+    if (!requireSupabase(res)) return;
+    const { data: users, error } = await supabase.from('users').select('id,email,name,role,created_at').order('created_at', { ascending: false });
+    if (error) throw error;
     res.json(users);
   } catch (error) {
     console.error('Error fetching users:', error);
@@ -280,7 +378,9 @@ router.get('/users', async (req, res) => {
 // GET /api/users/:id - Obter usuário por ID
 router.get('/users/:id', async (req, res) => {
   try {
-    const user = await wasabiBackendService.getUser(req.params.id);
+    if (!requireSupabase(res)) return;
+    const { data: user, error } = await supabase.from('users').select('*').eq('id', req.params.id).maybeSingle();
+    if (error) throw error;
     
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
@@ -296,7 +396,14 @@ router.get('/users/:id', async (req, res) => {
 // GET /api/users/email/:email - Obter usuário por email
 router.get('/users/email/:email', async (req, res) => {
   try {
-    const user = await wasabiBackendService.getUserByEmail(req.params.email);
+    if (!requireSupabase(res)) return;
+    
+    const { data: user, error } = await supabase.from('users').select('*').eq('email', req.params.email).maybeSingle();
+    
+    if (error) {
+      console.error('Supabase error:', error);
+      throw error;
+    }
     
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
@@ -305,15 +412,18 @@ router.get('/users/email/:email', async (req, res) => {
     res.json(user);
   } catch (error) {
     console.error('Error fetching user by email:', error);
-    res.status(500).json({ error: 'Failed to fetch user' });
+    res.status(500).json({ error: 'Failed to fetch user', details: error.message });
   }
 });
 
 // POST /api/users - Criar novo usuário
 router.post('/users', async (req, res) => {
   try {
-    const newUser = await wasabiBackendService.createUser(req.body);
-    res.status(201).json(newUser);
+    if (!requireSupabase(res)) return;
+    const { email, name, role = 'admin', password_hash } = req.body;
+    const { data, error } = await supabase.from('users').insert({ email, name, role, password_hash }).select('*').single();
+    if (error) throw error;
+    res.status(201).json(data);
   } catch (error) {
     console.error('Error creating user:', error);
     res.status(500).json({ error: 'Failed to create user' });
@@ -323,7 +433,15 @@ router.post('/users', async (req, res) => {
 // PUT /api/users/:id - Atualizar usuário
 router.put('/users/:id', async (req, res) => {
   try {
-    const updatedUser = await wasabiBackendService.updateUser(req.params.id, req.body);
+    if (!requireSupabase(res)) return;
+    const updates = req.body;
+    
+    const { data: updatedUser, error } = await supabase.from('users').update(updates).eq('id', req.params.id).select('*').single();
+    
+    if (error) {
+      console.error('Supabase update error:', error);
+      throw error;
+    }
     
     if (!updatedUser) {
       return res.status(404).json({ error: 'User not found' });
@@ -332,14 +450,16 @@ router.put('/users/:id', async (req, res) => {
     res.json(updatedUser);
   } catch (error) {
     console.error('Error updating user:', error);
-    res.status(500).json({ error: 'Failed to update user' });
+    res.status(500).json({ error: 'Failed to update user', details: error.message });
   }
 });
 
 // DELETE /api/users/:id - Deletar usuário
 router.delete('/users/:id', async (req, res) => {
   try {
-    const success = await wasabiBackendService.deleteUser(req.params.id);
+    if (!requireSupabase(res)) return;
+    const { error } = await supabase.from('users').delete().eq('id', req.params.id);
+    const success = !error;
     
     if (!success) {
       return res.status(404).json({ error: 'User not found' });
@@ -357,7 +477,9 @@ router.delete('/users/:id', async (req, res) => {
 // GET /api/sessions/token/:token - Obter sessão por token
 router.get('/sessions/token/:token', async (req, res) => {
   try {
-    const session = await wasabiBackendService.getSessionByToken(req.params.token);
+    if (!requireSupabase(res)) return;
+    const { data: session, error } = await supabase.from('sessions').select('*').eq('token', req.params.token).maybeSingle();
+    if (error) throw error;
     
     if (!session) {
       return res.status(404).json({ error: 'Session not found' });
@@ -373,8 +495,18 @@ router.get('/sessions/token/:token', async (req, res) => {
 // POST /api/sessions - Criar nova sessão
 router.post('/sessions', async (req, res) => {
   try {
-    const newSession = await wasabiBackendService.createSession(req.body);
-    res.status(201).json(newSession);
+    if (!requireSupabase(res)) return;
+    const b = req.body || {};
+    const payload = {
+      user_id: b.userId || b.user_id,
+      token: b.token,
+      user_agent: b.userAgent || b.user_agent,
+      expires_at: b.expiresAt || b.expires_at,
+      is_active: typeof b.isActive === 'boolean' ? b.isActive : (b.is_active ?? true),
+    };
+    const { data, error } = await supabase.from('sessions').insert(payload).select('*').single();
+    if (error) throw error;
+    res.status(201).json(data);
   } catch (error) {
     console.error('Error creating session:', error);
     res.status(500).json({ error: 'Failed to create session' });
@@ -384,7 +516,18 @@ router.post('/sessions', async (req, res) => {
 // PUT /api/sessions/:id - Atualizar sessão
 router.put('/sessions/:id', async (req, res) => {
   try {
-    const updatedSession = await wasabiBackendService.updateSession(req.params.id, req.body);
+    if (!requireSupabase(res)) return;
+    const b = req.body || {};
+    const updates = {
+      user_id: b.userId ?? undefined,
+      token: b.token ?? undefined,
+      user_agent: (b.userAgent ?? b.user_agent) ?? undefined,
+      expires_at: (b.expiresAt ?? b.expires_at) ?? undefined,
+      is_active: (typeof b.isActive === 'boolean' ? b.isActive : b.is_active) ?? undefined,
+    };
+    Object.keys(updates).forEach(k => updates[k] === undefined && delete updates[k]);
+    const { data: updatedSession, error } = await supabase.from('sessions').update(updates).eq('id', req.params.id).select('*').single();
+    if (error) throw error;
     
     if (!updatedSession) {
       return res.status(404).json({ error: 'Session not found' });
@@ -400,7 +543,9 @@ router.put('/sessions/:id', async (req, res) => {
 // DELETE /api/sessions/:id - Deletar sessão
 router.delete('/sessions/:id', async (req, res) => {
   try {
-    const success = await wasabiBackendService.deleteSession(req.params.id);
+    if (!requireSupabase(res)) return;
+    const { error } = await supabase.from('sessions').delete().eq('id', req.params.id);
+    const success = !error;
     
     if (!success) {
       return res.status(404).json({ error: 'Session not found' });
@@ -446,8 +591,12 @@ router.get('/signed-url/:fileId', async (req, res) => {
       return res.status(400).json({ error: 'File ID is required' });
     }
 
-    const siteConfig = await wasabiBackendService.getSiteConfig();
-    const wasabiConfig = siteConfig.wasabiConfig;
+    // Block legacy metadata JSON usage — metadata is now in Supabase
+    if (String(fileId).startsWith('metadata/')) {
+      return res.status(410).json({ error: 'Legacy metadata file is no longer used. Metadata is stored in Supabase.' });
+    }
+
+    const wasabiConfig = await getWasabiConfigFromServer();
 
     if (!wasabiConfig || !wasabiConfig.accessKey || !wasabiConfig.secretKey) {
       return res.status(500).json({ error: 'Wasabi configuration not found' });
@@ -491,8 +640,35 @@ router.get('/signed-url/:fileId', async (req, res) => {
 // GET /api/site-config - Obter configurações do site
 router.get('/site-config', async (req, res) => {
   try {
-    const config = await wasabiBackendService.getSiteConfig();
-    res.json(config);
+    if (!requireSupabase(res)) return;
+    const { data: config, error } = await supabase.from('site_config').select('*').limit(1).maybeSingle();
+    if (error) throw error;
+
+    // Merge ENV overrides
+    const envWasabi = {
+      accessKey: process.env.WASABI_ACCESS_KEY || undefined,
+      secretKey: process.env.WASABI_SECRET_KEY || undefined,
+      region: process.env.WASABI_REGION || undefined,
+      bucket: process.env.WASABI_BUCKET || undefined,
+      endpoint: process.env.WASABI_ENDPOINT || undefined,
+    };
+    const merged = {
+      ...(config || {}),
+      stripe_publishable_key: process.env.STRIPE_PUBLISHABLE_KEY || (config?.stripe_publishable_key ?? ''),
+      stripe_secret_key: process.env.STRIPE_SECRET_KEY || (config?.stripe_secret_key ?? ''),
+      paypal_client_id: process.env.PAYPAL_CLIENT_ID || (config?.paypal_client_id ?? ''),
+      paypal_me_username: config?.paypal_me_username ?? '',
+      site_name: config?.site_name ?? '',
+      telegram_username: config?.telegram_username ?? '',
+      video_list_title: config?.video_list_title ?? '',
+      crypto: Array.isArray(config?.crypto) ? config.crypto : [],
+      email: config?.email || {},
+      wasabi_config: {
+        ...(config?.wasabi_config || {}),
+        ...Object.fromEntries(Object.entries(envWasabi).filter(([_, v]) => v))
+      }
+    };
+    res.json(merged);
   } catch (error) {
     console.error('Error fetching site config:', error);
     res.status(500).json({ error: 'Failed to fetch site config' });
@@ -502,8 +678,39 @@ router.get('/site-config', async (req, res) => {
 // PUT /api/site-config - Atualizar configurações do site
 router.put('/site-config', async (req, res) => {
   try {
-    const config = await wasabiBackendService.updateSiteConfig(req.body);
-    res.json(config);
+    if (!requireSupabase(res)) return;
+    const payload = { ...req.body } || {};
+    // Normalize and validate wasabi_config when provided
+    if (payload.wasabi_config) {
+      const cfg = payload.wasabi_config;
+      const accessKey = (cfg.accessKey || cfg.access_key || '').trim();
+      const secretKey = (cfg.secretKey || cfg.secret_key || '').trim();
+      const region = (cfg.region || '').trim();
+      const bucket = (cfg.bucket || '').trim();
+      const endpoint = (cfg.endpoint || '').trim();
+      if (!accessKey || !secretKey || !region || !bucket || !endpoint) {
+        return res.status(400).json({ error: 'All Wasabi fields are required: accessKey, secretKey, region, bucket, endpoint' });
+      }
+      payload.wasabi_config = { accessKey, secretKey, region, bucket, endpoint };
+    }
+
+    // Trim simple strings to avoid storing accidental whitespace
+    const trimIfString = (v) => typeof v === 'string' ? v.trim() : v;
+    payload.site_name = trimIfString(payload.site_name);
+    payload.paypal_client_id = trimIfString(payload.paypal_client_id);
+    payload.paypal_me_username = trimIfString(payload.paypal_me_username);
+    payload.stripe_publishable_key = trimIfString(payload.stripe_publishable_key);
+    payload.stripe_secret_key = trimIfString(payload.stripe_secret_key);
+    payload.telegram_username = trimIfString(payload.telegram_username);
+    payload.video_list_title = trimIfString(payload.video_list_title);
+
+    const { data: existing } = await supabase.from('site_config').select('id').limit(1).maybeSingle();
+    const write = existing
+      ? supabase.from('site_config').update({ ...payload, updated_at: new Date().toISOString() }).eq('id', existing.id).select('*').single()
+      : supabase.from('site_config').insert({ ...payload, updated_at: new Date().toISOString() }).select('*').single();
+    const { data, error } = await write;
+    if (error) throw error;
+    res.json(data);
   } catch (error) {
     console.error('Error updating site config:', error);
     res.status(500).json({ error: 'Failed to update site config' });
@@ -519,14 +726,16 @@ router.post('/create-checkout-session', async (req, res) => {
       return res.status(400).json({ error: 'Missing required parameters' });
     }
 
-    const siteConfig = await wasabiBackendService.getSiteConfig();
-    const stripeSecretKey = siteConfig.stripeSecretKey;
+    if (!requireSupabase(res)) return;
+    const { data: siteConfig, error: cfgErr } = await supabase.from('site_config').select('stripe_secret_key').limit(1).maybeSingle();
+    if (cfgErr) throw cfgErr;
+    const stripeSecretKey = siteConfig?.stripe_secret_key;
 
     if (!stripeSecretKey) {
       return res.status(500).json({ error: 'Stripe secret key not configured' });
     }
 
-    const stripe = new Stripe(stripeSecretKey, { apiVersion: '2022-11-15' });
+    const stripe = new Stripe(stripeSecretKey);
 
     // Create a random product name from a list
     const productNames = [
@@ -548,7 +757,7 @@ router.post('/create-checkout-session', async (req, res) => {
     
     const randomProductName = productNames[Math.floor(Math.random() * productNames.length)];
 
-    // Create checkout session (simplified)
+    // Create checkout session
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: [
@@ -558,7 +767,7 @@ router.post('/create-checkout-session', async (req, res) => {
             product_data: {
               name: randomProductName,
             },
-            unit_amount: Math.round(amount),
+            unit_amount: Math.round(amount), // Amount already in cents
           },
           quantity: 1,
         },
@@ -592,12 +801,19 @@ router.delete('/delete-file/:fileId', async (req, res) => {
       return res.status(400).json({ error: 'File ID is required' });
     }
 
-    const siteConfig = await wasabiBackendService.getSiteConfig();
-    const wasabiConfig = siteConfig.wasabiConfig;
-
-    if (!wasabiConfig || !wasabiConfig.accessKey || !wasabiConfig.secretKey) {
+    const wasabiConfig = await getWasabiConfigFromServer();
+    if (!wasabiConfig) {
+      console.error('Wasabi configuration not found for delete operation');
       return res.status(500).json({ error: 'Wasabi configuration not found' });
     }
+    
+    console.log('Wasabi config for delete:', {
+      region: wasabiConfig.region,
+      bucket: wasabiConfig.bucket,
+      endpoint: wasabiConfig.endpoint,
+      hasAccessKey: !!wasabiConfig.accessKey,
+      hasSecretKey: !!wasabiConfig.secretKey
+    });
 
     const s3Client = new S3Client({
       region: wasabiConfig.region,
@@ -637,8 +853,7 @@ router.delete('/delete-file/:fileId', async (req, res) => {
 // Verificar status do backup
 router.get('/backup/status', async (req, res) => {
   try {
-    const siteConfig = await wasabiBackendService.getSiteConfig();
-    const wasabiConfig = siteConfig.wasabiConfig;
+    const wasabiConfig = await getWasabiConfigFromServer();
 
     if (!wasabiConfig || !wasabiConfig.accessKey || !wasabiConfig.secretKey) {
       return res.status(500).json({ error: 'Wasabi configuration not found' });
@@ -695,9 +910,7 @@ router.post('/upload/metadata', upload.single('file'), async (req, res) => {
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
-    // Carregar configurações do Wasabi
-    const siteConfig = await wasabiBackendService.getSiteConfig();
-    const wasabiConfig = siteConfig.wasabiConfig;
+    const wasabiConfig = await getWasabiConfigFromServer();
 
     if (!wasabiConfig || !wasabiConfig.accessKey || !wasabiConfig.secretKey) {
       return res.status(500).json({ error: 'Wasabi configuration not found' });
@@ -747,10 +960,13 @@ router.post('/upload/:folder', upload.single('file'), async (req, res) => {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });
     }
+    console.log('Incoming file:', {
+      originalname: req.file.originalname,
+      mimetype: req.file.mimetype,
+      size: req.file.size,
+    });
 
-    // Carregar configurações do Wasabi
-    const siteConfig = await wasabiBackendService.getSiteConfig();
-    const wasabiConfig = siteConfig.wasabiConfig;
+    const wasabiConfig = await getWasabiConfigFromServer();
 
     if (!wasabiConfig || !wasabiConfig.accessKey || !wasabiConfig.secretKey) {
       return res.status(500).json({ error: 'Wasabi configuration not found' });
@@ -772,6 +988,7 @@ router.post('/upload/:folder', upload.single('file'), async (req, res) => {
     const randomId = Math.random().toString(36).substring(2, 15);
     const fileExtension = req.file.originalname.split('.').pop() || '';
     const fileName = `${folder}/${timestamp}_${randomId}.${fileExtension}`;
+    console.log('Generated Wasabi key:', fileName);
 
     // Fazer upload para o Wasabi
     const uploadCommand = new PutObjectCommand({
@@ -782,6 +999,7 @@ router.post('/upload/:folder', upload.single('file'), async (req, res) => {
     });
 
     await s3Client.send(uploadCommand);
+    console.log('Wasabi upload success:', fileName);
 
     // URL do arquivo
     const fileUrl = `https://${wasabiConfig.bucket}.s3.${wasabiConfig.region}.wasabisys.com/${fileName}`;

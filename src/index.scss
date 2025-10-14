@@ -15,17 +15,28 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  background-color: #000000 !important;
+  color: #ffffff !important;
+}
+
+html {
+  background-color: #000000 !important;
+}
+
+#root {
+  background-color: #000000 !important;
+  min-height: 100vh;
 }
 
 // Theme variables
-$dark-bg: #121212;
-$dark-paper: #1e1e1e;
-$light-bg: #f5f5f5;
-$light-paper: #ffffff;
-$primary-color: #ff0000;
-$secondary-color: #b71c1c;
+$dark-bg: #000000;
+$dark-paper: #1a1a1a;
+$light-bg: #000000;
+$light-paper: #1a1a1a;
+$primary-color: #8e24aa;
+$secondary-color: #6a1b9a;
 $text-light: #ffffff;
-$text-dark: #212121;
+$text-dark: #ffffff;
 
 // Dark theme specific styles
 .dark-theme {

@@ -2,11 +2,10 @@ import { useState, useEffect, useRef, ChangeEvent } from 'react';
 import type { FC } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../services/Auth';
-import { VideoServiceSupabase } from '../services/VideoServiceSupabase';
+import { VideoService } from '../services/VideoService';
+import { SupabaseService } from '../services/SupabaseService';
 import { wasabiService } from '../services/WasabiService';
 import { useSiteConfig } from '../context/SiteConfigContext';
-import { UserServiceSupabase } from '../services/UserServiceSupabase';
-import { SiteConfigServiceSupabase } from '../services/SiteConfigServiceSupabase';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import SendIcon from '@mui/icons-material/Send';
 import Container from '@mui/material/Container';
@@ -33,6 +32,7 @@ import LinearProgress from '@mui/material/LinearProgress';
 import EditIcon from '@mui/icons-material/Edit';
 import CancelIcon from '@mui/icons-material/Cancel';
 import AddIcon from '@mui/icons-material/Add';
+import RemoveIcon from '@mui/icons-material/Remove';
 import SearchIcon from '@mui/icons-material/Search';
 import Chip from '@mui/material/Chip';
 import Switch from '@mui/material/Switch';
@@ -49,13 +49,11 @@ import InputAdornment from '@mui/material/InputAdornment';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import { styled } from '@mui/material/styles';
 import Card from '@mui/material/Card';
-import OnlineUsersPanel from '../components/OnlineUsersPanel';
 import CardContent from '@mui/material/CardContent';
 import CardMedia from '@mui/material/CardMedia';
 import Collapse from '@mui/material/Collapse';
 import Divider from '@mui/material/Divider';
 import VideoLibraryIcon from '@mui/icons-material/VideoLibrary';
-import PeopleIcon from '@mui/icons-material/People';
 import SettingsIcon from '@mui/icons-material/Settings';
 import GroupIcon from '@mui/icons-material/Group';
 import Snackbar from '@mui/material/Snackbar';
@@ -63,9 +61,6 @@ import MuiAlert, { AlertProps } from '@mui/material/Alert';
 import Tooltip from '@mui/material/Tooltip';
 import React from 'react';
 import SecurityIcon from '@mui/icons-material/Security';
-import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
-import LockIcon from '@mui/icons-material/Lock';
-import PersonAddIcon from '@mui/icons-material/PersonAdd';
 
 // Tab panel component
 interface TabPanelProps {
@@ -120,9 +115,7 @@ interface Video {
   price: number;
   product_link?: string;
   video_id?: string;
-  videoFileId?: string;
   thumbnail_id?: string;
-  thumbnailFileId?: string;
   created_at: string;
   is_active: boolean;
   duration?: number;
@@ -164,6 +157,15 @@ interface SiteConfig {
 }
 
 // Admin page component
+// Hash password using Web Crypto API (browser)
+async function hashPasswordWithWebCrypto(password: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(password);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
 const Admin: FC = () => {
   const { user } = useAuth();
   const { refreshConfig, updateConfig } = useSiteConfig();
@@ -190,6 +192,18 @@ const Admin: FC = () => {
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [videoDuration, setVideoDuration] = useState<number | null>(null);
+  
+  // Sources state (multiple files for the same title)
+  const [relatedVideos, setRelatedVideos] = useState<Array<{
+    id: string;
+    videoFile: File | null; // source file
+    duration: number | null; // optional, not stored in video_sources
+  }>>([]);
+
+  // Store source files directly for upload
+  const [sourceFiles, setSourceFiles] = useState<File[]>([]);
+
+  const [showRelatedVideos, setShowRelatedVideos] = useState(false);
   
   // Users state
   const [users, setUsers] = useState<User[]>([]);
@@ -256,19 +270,6 @@ const Admin: FC = () => {
   
   // Video element ref for getting duration
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  
-  // Admin management state
-  const [adminUsers, setAdminUsers] = useState<User[]>([]);
-  const [showAdminForm, setShowAdminForm] = useState(false);
-  const [editingAdmin, setEditingAdmin] = useState<string | null>(null);
-  const [adminName, setAdminName] = useState('');
-  const [adminEmail, setAdminEmail] = useState('');
-  const [adminPassword, setAdminPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmNewPassword, setConfirmNewPassword] = useState('');
-  const [showChangePasswordForm, setShowChangePasswordForm] = useState(false);
 
   // Event listener for show-feedback events
   useEffect(() => {
@@ -298,8 +299,6 @@ const Admin: FC = () => {
     } else if (tabValue === 1) {
       fetchUsers();
       fetchSiteConfig();
-    } else if (tabValue === 2) {
-      fetchAdminUsers();
     }
   }, [tabValue]);
 
@@ -309,10 +308,10 @@ const Admin: FC = () => {
       setLoading(true);
       setError(null);
       
-      const allVideos = await VideoServiceSupabase.getAllVideos();
-      console.log(`Admin: Fetched ${allVideos.length} videos using VideoServiceSupabase`);
+      const allVideos = await VideoService.getAllVideos();
+      console.log(`Admin: Fetched ${allVideos.length} videos using VideoService`);
       
-      // Convert VideoServiceSupabase format to Admin format
+      // Convert VideoService format to Admin format
       const adminVideos = allVideos.map(video => ({
         $id: video.$id,
         title: video.title,
@@ -321,7 +320,7 @@ const Admin: FC = () => {
         product_link: video.product_link || '',
         video_id: video.video_id || video.videoFileId,
         thumbnail_id: video.thumbnail_id || video.thumbnailFileId,
-        created_at: video.createdAt,
+        created_at: video.created_at,
         is_active: true,
         duration: typeof video.duration === 'string' ? 
           // Convert duration string (MM:SS or HH:MM:SS) to seconds
@@ -345,103 +344,80 @@ const Admin: FC = () => {
       setLoading(true);
       setError(null);
       
-      const usersData = await UserServiceSupabase.getAllUsers();
+      const usersData = await SupabaseService.listUsers();
       
       // Convert to admin format
-      const adminUsers = usersData.map((user: any) => ({
+      const adminUsers = usersData.map(user => ({
         $id: user.id,
         email: user.email,
         name: user.name,
-        password: user.password,
+        password: '', // Don't expose password hash
         created_at: user.created_at
       })) as unknown as User[];
       
       setUsers(adminUsers);
     } catch (err) {
-      console.error('Error fetching users from Supabase:', err);
-      setError('Failed to load users from Supabase. Please try again.');
+      console.error('Error fetching users:', err);
+      setError('Failed to load users. Please try again.');
     } finally {
       setLoading(false);
     }
   };
   
-  // Fetch admin users
-  const fetchAdminUsers = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const usersData = await UserServiceSupabase.getAllUsers();
-      
-      // Filter only admin users (you can add a role field later)
-      const adminUsers = usersData.map((user: any) => ({
-        $id: user.id,
-        email: user.email,
-        name: user.name,
-        password: user.password,
-        created_at: user.created_at
-      })) as unknown as User[];
-      
-      setAdminUsers(adminUsers);
-    } catch (err) {
-      console.error('Error fetching admin users:', err);
-      setError('Failed to load admin users. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   // Fetch site configuration
   const fetchSiteConfig = async () => {
     try {
       setLoading(true);
       setError(null);
       
-      const configData = await SiteConfigServiceSupabase.getSiteConfig();
-      
-      if (configData) {
-        const config: SiteConfig = {
-          $id: 'site-config',
-          site_name: configData.siteName,
-          paypal_client_id: configData.paypalClientId,
-          paypal_me_username: configData.paypalMeUsername,
-          stripe_publishable_key: configData.stripePublishableKey,
-          stripe_secret_key: configData.stripeSecretKey,
-          telegram_username: configData.telegramUsername,
-          video_list_title: configData.videoListTitle,
-          crypto: configData.crypto
-        };
-        
-        setSiteConfig(config);
-        setSiteName(config.site_name);
-        setPaypalClientId(config.paypal_client_id);
-        setPaypalMeUsername(config.paypal_me_username || '');
-        setStripePublishableKey(config.stripe_publishable_key || '');
-        setStripeSecretKey(config.stripe_secret_key || '');
-        setTelegramUsername(config.telegram_username);
-        setVideoListTitle(config.video_list_title || 'Available Videos');
-        setCryptoWallets(config.crypto || []);
-        
-        // Email settings
-        setEmailHost(configData.emailHost || '');
-        setEmailPort(configData.emailPort || '');
-        setEmailSecure(configData.emailSecure || false);
-        setEmailUser(configData.emailUser || '');
-        setEmailPass(configData.emailPass || '');
-        setEmailFrom(configData.emailFrom || '');
-        
-        // Wasabi settings
-        if (configData.wasabiConfig) {
-          setWasabiAccessKey(configData.wasabiConfig.accessKey || '');
-          setWasabiSecretKey(configData.wasabiConfig.secretKey || '');
-          setWasabiRegion(configData.wasabiConfig.region || '');
-          setWasabiBucket(configData.wasabiConfig.bucket || '');
-          setWasabiEndpoint(configData.wasabiConfig.endpoint || '');
-        }
+      const API_BASE_URL = import.meta.env.DEV ? 'http://localhost:3000' : (import.meta.env.VITE_API_URL || '');
+      const resp = await fetch(`${API_BASE_URL}/api/site-config`);
+      if (!resp.ok) throw new Error(`Failed to fetch site config: ${resp.status}`);
+      const configData = await resp.json();
+
+      const config: SiteConfig = {
+        $id: configData.id || 'site-config',
+        site_name: configData.site_name || '',
+        paypal_client_id: configData.paypal_client_id || '',
+        paypal_me_username: configData.paypal_me_username || '',
+        stripe_publishable_key: configData.stripe_publishable_key || '',
+        stripe_secret_key: configData.stripe_secret_key || '',
+        telegram_username: configData.telegram_username || '',
+        video_list_title: configData.video_list_title || 'Available Videos',
+        crypto: Array.isArray(configData.crypto) ? configData.crypto : [],
+        email: configData.email || {},
+        wasabi_config: configData.wasabi_config || configData.wasabiConfig || undefined,
+      } as any;
+
+      setSiteConfig(config);
+      setSiteName(config.site_name);
+      setPaypalClientId(config.paypal_client_id);
+      setPaypalMeUsername(config.paypal_me_username || '');
+      setStripePublishableKey(config.stripe_publishable_key || '');
+      setStripeSecretKey(config.stripe_secret_key || '');
+      setTelegramUsername(config.telegram_username);
+      setVideoListTitle(config.video_list_title || 'Available Videos');
+      setCryptoWallets(config.crypto || []);
+
+      // Email settings
+      setEmailHost(config.email?.host || '');
+      setEmailPort(config.email?.port || '');
+      setEmailSecure(!!config.email?.secure);
+      setEmailUser(config.email?.user || '');
+      setEmailPass(config.email?.pass || '');
+      setEmailFrom(config.email?.from || '');
+
+      // Wasabi settings (merge env already returned by API if present)
+      if (config.wasabi_config) {
+        setWasabiAccessKey(config.wasabi_config.accessKey || config.wasabi_config.access_key || '');
+        setWasabiSecretKey(config.wasabi_config.secretKey || config.wasabi_config.secret_key || '');
+        setWasabiRegion(config.wasabi_config.region || '');
+        setWasabiBucket(config.wasabi_config.bucket || '');
+        setWasabiEndpoint(config.wasabi_config.endpoint || '');
       }
     } catch (err) {
-      console.error('Error fetching site config from Supabase:', err);
-      setError('Failed to load site configuration from Supabase');
+      console.error('Error fetching site config:', err);
+      setError('Failed to load site configuration');
     } finally {
       setLoading(false);
     }
@@ -468,7 +444,7 @@ const Admin: FC = () => {
       setLoading(true);
       setError(null);
       
-      const success = await VideoServiceSupabase.deleteVideo(id);
+      const success = await VideoService.deleteVideo(id);
       
       if (success) {
         showFeedback('Video successfully deleted!', 'success');
@@ -486,129 +462,19 @@ const Admin: FC = () => {
     }
   };
   
-  // Save admin (create or update)
-  const handleSaveAdmin = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      if (!adminName || !adminEmail || !adminPassword) {
-        showFeedback('Please fill in all required fields', 'error');
-        return;
-      }
-
-      if (adminPassword !== confirmPassword) {
-        showFeedback('Passwords do not match', 'error');
-        return;
-      }
-
-      const adminData = {
-        name: adminName,
-        email: adminEmail,
-        password: adminPassword
-      };
-
-      if (editingAdmin) {
-        // Update existing admin
-        const updateData = {
-          name: adminName,
-          email: adminEmail
-        };
-        
-        const success = await UserServiceSupabase.updateUser(editingAdmin, updateData);
-        if (success) {
-          // If password is provided, update it separately
-          if (adminPassword) {
-            const passwordSuccess = await UserServiceSupabase.changePassword(editingAdmin, adminPassword);
-            if (!passwordSuccess) {
-              showFeedback('Admin updated but password change failed', 'error');
-              return;
-            }
-          }
-          
-          showFeedback('Admin updated successfully!', 'success');
-          fetchAdminUsers();
-          setShowAdminForm(false);
-          setEditingAdmin(null);
-        } else {
-          showFeedback('Failed to update admin', 'error');
-        }
-      } else {
-        // Create new admin
-        const success = await UserServiceSupabase.createUser(adminData);
-        if (success) {
-          showFeedback('Admin created successfully!', 'success');
-          fetchAdminUsers();
-          setShowAdminForm(false);
-        } else {
-          showFeedback('Failed to create admin', 'error');
-        }
-      }
-
-      // Reset form
-      setAdminName('');
-      setAdminEmail('');
-      setAdminPassword('');
-      setConfirmPassword('');
-
-    } catch (err) {
-      console.error('Error saving admin:', err);
-      showFeedback('Failed to save admin. Please try again.', 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Change current user password
-  const handleChangePassword = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      if (!currentPassword || !newPassword || !confirmNewPassword) {
-        showFeedback('Please fill in all password fields', 'error');
-        return;
-      }
-
-      if (newPassword !== confirmNewPassword) {
-        showFeedback('New passwords do not match', 'error');
-        return;
-      }
-
-      if (newPassword.length < 6) {
-        showFeedback('New password must be at least 6 characters', 'error');
-        return;
-      }
-
-      // Here you would typically verify the current password first
-      // For now, we'll just update it
-      const success = await UserServiceSupabase.changePassword(user?.$id || '', newPassword);
-
-      if (success) {
-        showFeedback('Password changed successfully!', 'success');
-        setShowChangePasswordForm(false);
-        setCurrentPassword('');
-        setNewPassword('');
-        setConfirmNewPassword('');
-      } else {
-        showFeedback('Failed to change password', 'error');
-      }
-
-    } catch (err) {
-      console.error('Error changing password:', err);
-      showFeedback('Failed to change password. Please try again.', 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   // Delete user
   const handleDeleteUser = async (id: string) => {
     try {
       setLoading(true);
       setError(null);
       
-      const success = await UserServiceSupabase.deleteUser(id);
+      let success = false;
+      try {
+        await SupabaseService.deleteUser(id);
+        success = true;
+      } catch (e) {
+        success = false;
+      }
       
       if (success) {
         showFeedback('User successfully deleted!', 'success');
@@ -617,13 +483,34 @@ const Admin: FC = () => {
         showFeedback('Failed to delete user', 'error');
       }
     } catch (err) {
-      console.error('Error deleting user from Supabase:', err);
+      console.error('Error deleting user:', err);
       showFeedback('Failed to delete user. Please try again.', 'error');
     } finally {
       setLoading(false);
       setDeleteDialogOpen(false);
       setItemToDelete(null);
     }
+  };
+
+  // Related videos functions
+  const addRelatedVideo = () => {
+    const genId = (typeof crypto !== 'undefined' && (crypto as any).randomUUID) ? (crypto as any).randomUUID() : `${Date.now()}_${Math.random().toString(36).slice(2,8)}`;
+    const newRelatedVideo = {
+      id: genId,
+      videoFile: null,
+      duration: null,
+    } as any;
+    setRelatedVideos([...relatedVideos, newRelatedVideo]);
+  };
+
+  const removeRelatedVideo = (id: string) => {
+    setRelatedVideos(relatedVideos.filter(video => video.id !== id));
+  };
+
+  const updateRelatedVideo = (id: string, field: string, value: any) => {
+    setRelatedVideos(relatedVideos.map(video => 
+      video.id === id ? { ...video, [field]: value } : video
+    ));
   };
 
   // Save video (create or update)
@@ -709,27 +596,79 @@ const Admin: FC = () => {
 
       setUploadProgress(90);
 
-      if (editingVideo) {
-        // Update existing video using VideoServiceSupabase
-        const updatedVideo = await VideoServiceSupabase.updateVideo(editingVideo, videoData);
-        if (updatedVideo) {
+      // Sources handling (video_sources) - moved to after main video creation/update
+
+      const uploadAndInsert = async (videoIdForInsert: string) => {
+        let created = 0;
+        console.log('[admin] uploadAndInsert using sourceFiles:', sourceFiles.map(f => f.name));
+        
+        for (let index = 0; index < sourceFiles.length; index++) {
+          const file = sourceFiles[index];
+          console.log(`[admin] uploading source ${index + 1}/${sourceFiles.length}:`, file.name, file.type, file.size);
+          const sourceUpload = await wasabiService.uploadFile(file, 'videos');
+          if (!sourceUpload.success) {
+            showFeedback('Failed to upload a source file', 'error');
+            continue;
+          }
+          const thumbId: string | undefined = undefined; // no per-source thumbnails
+          try {
+            await SupabaseService.addVideoSource(videoIdForInsert, sourceUpload.fileId, thumbId, index + 1);
+            created++;
+          } catch (e) {
+            console.error('Failed to insert video source:', e);
+          }
+        }
+        return created;
+      };
+
+      // Supabase write path
+      if (SupabaseService.isConfigured()) {
+        let videoId = '';
+        
+        if (editingVideo) {
+          const updates: any = {
+            title: videoData.title,
+            description: videoData.description,
+            price: videoData.price,
+            duration: videoData.duration,
+            video_file_id: videoData.videoFileId,
+            thumbnail_file_id: videoData.thumbnailFileId,
+            product_link: videoData.productLink,
+            is_active: true
+          };
+          await SupabaseService.updateVideo(editingVideo, updates);
+          videoId = editingVideo;
           showFeedback('Video updated successfully!', 'success');
-          fetchVideos();
-          setShowVideoForm(false);
-          setEditingVideo(null);
         } else {
-          showFeedback('Failed to update video', 'error');
-        }
-      } else {
-        // Create new video using VideoServiceSupabase
-        const newVideo = await VideoServiceSupabase.createVideo(videoData);
-        if (newVideo) {
+          const created = await SupabaseService.createVideo({
+            title: videoData.title,
+            description: videoData.description,
+            price: videoData.price,
+            duration: videoData.duration,
+            video_file_id: videoData.videoFileId,
+            thumbnail_file_id: videoData.thumbnailFileId,
+            product_link: videoData.productLink,
+            is_active: true,
+          });
+          videoId = created.id;
           showFeedback('Video uploaded successfully!', 'success');
-          fetchVideos();
-          setShowVideoForm(false);
-        } else {
-          showFeedback('Failed to create video', 'error');
         }
+
+        // Handle sources AFTER main video is created/updated
+        const hasSources = sourceFiles.length > 0;
+        console.log('[admin] hasSources:', hasSources, 'sourceFiles:', sourceFiles.map(f => f.name));
+        
+        if (hasSources) {
+          console.log('[admin] calling uploadAndInsert for video:', videoId);
+          const count = await uploadAndInsert(videoId);
+          showFeedback(`Uploaded ${count} source(s)`, 'success');
+        }
+
+        fetchVideos();
+        setShowVideoForm(false);
+        setEditingVideo(null);
+      } else {
+        showFeedback('Supabase not configured', 'error');
       }
 
       setUploadProgress(100);
@@ -742,6 +681,7 @@ const Admin: FC = () => {
       setVideoFile(null);
       setThumbnailFile(null);
       setVideoDuration(null);
+      setSourceFiles([]);
 
     } catch (err) {
       console.error('Error saving video:', err);
@@ -782,14 +722,53 @@ const Admin: FC = () => {
         }
       };
 
-      await SiteConfigServiceSupabase.updateSiteConfig(configData);
-      
+      // Save to Supabase via API
+      const API_BASE_URL = import.meta.env.DEV ? 'http://localhost:3000' : (import.meta.env.VITE_API_URL || '');
+      const payload: any = {
+        site_name: configData.siteName,
+        paypal_client_id: configData.paypalClientId,
+        paypal_me_username: configData.paypalMeUsername,
+        stripe_publishable_key: configData.stripePublishableKey,
+        stripe_secret_key: configData.stripeSecretKey,
+        telegram_username: configData.telegramUsername,
+        video_list_title: configData.videoListTitle,
+        crypto: configData.crypto,
+        email: {
+          host: configData.emailHost,
+          port: configData.emailPort,
+          secure: configData.emailSecure,
+          user: configData.emailUser,
+          pass: configData.emailPass,
+          from: configData.emailFrom
+        }
+      };
+      // Only send wasabi_config if all fields are present to avoid 400 from API
+      const wc = configData.wasabiConfig || ({} as any);
+      const hasAllWasabi = [wc.accessKey, wc.secretKey, wc.region, wc.bucket, wc.endpoint]
+        .every(v => typeof v === 'string' ? v.trim().length > 0 : !!v);
+      if (hasAllWasabi) {
+        payload.wasabi_config = {
+          accessKey: wc.accessKey?.trim(),
+          secretKey: wc.secretKey?.trim(),
+          region: wc.region?.trim(),
+          bucket: wc.bucket?.trim(),
+          endpoint: wc.endpoint?.trim()
+        };
+      }
+      const resp = await fetch(`${API_BASE_URL}/api/site-config`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!resp.ok) {
+        throw new Error(`Failed to save config: ${resp.status} ${resp.statusText}`);
+      }
       showFeedback('Configuration saved successfully!', 'success');
       setEditingConfig(false);
       fetchSiteConfig();
       
     } catch (err) {
-      console.error('Error saving configuration to Supabase:', err);
+      console.error('Error saving configuration:', err);
       showFeedback('Failed to save configuration. Please try again.', 'error');
     } finally {
       setLoading(false);
@@ -803,8 +782,6 @@ const Admin: FC = () => {
           <Tabs value={tabValue} onChange={handleTabChange} aria-label="admin tabs">
             <Tab icon={<VideoLibraryIcon />} label="Manage Videos" />
             <Tab icon={<SettingsIcon />} label="Site Configuration & Users" />
-            <Tab icon={<AdminPanelSettingsIcon />} label="Admin Management" />
-            <Tab icon={<PeopleIcon />} label="Online Users" />
           </Tabs>
         </Box>
         
@@ -1017,6 +994,121 @@ const Admin: FC = () => {
                   )}
                 </Grid>
               </Grid>
+
+              {/* Related Videos Section */}
+              <Box sx={{ mt: 4, mb: 3 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                  <Typography variant="h6" component="h4">
+                    Related Videos (Optional)
+                  </Typography>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={() => {
+                      const next = !showRelatedVideos;
+                      setShowRelatedVideos(next);
+                      if (next && relatedVideos.length === 0) {
+                        setRelatedVideos([{ id: Date.now().toString(), videoFile: null, duration: null } as any]);
+                      }
+                    }}
+                    startIcon={showRelatedVideos ? <RemoveIcon /> : <AddIcon />}
+                  >
+                    {showRelatedVideos ? 'Hide Related Videos' : 'Add Related Videos'}
+                  </Button>
+                </Box>
+
+                {showRelatedVideos && (
+                  <Box sx={{ border: '1px dashed #ccc', borderRadius: 2, p: 2 }}>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                      Add multiple source files for this title. These will appear as previews and parts.
+                    </Typography>
+                    
+                    {relatedVideos.map((relatedVideo, index) => (
+                      <Paper key={relatedVideo.id} sx={{ p: 2, mb: 2, bgcolor: 'background.default' }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                          <Typography variant="subtitle2">
+                            Source {index + 1}
+                          </Typography>
+                          <Button
+                            size="small"
+                            color="error"
+                            onClick={() => removeRelatedVideo(relatedVideo.id)}
+                            startIcon={<DeleteIcon />}
+                          >
+                            Remove
+                          </Button>
+                        </Box>
+                        
+                        <Grid container spacing={2}>
+                          <Grid item xs={12} md={6}>
+                            <Typography variant="caption" sx={{ mb: 0.5, display: 'block' }}>
+                              Source ordering is based on the list position.
+                            </Typography>
+                          </Grid>
+                          
+                          <Grid item xs={12} md={6}>
+                            <Box sx={{ mb: 1 }}>
+                              <Typography variant="caption" sx={{ mb: 0.5, display: 'block' }}>
+                                Video File
+                              </Typography>
+                              <input
+                                type="file"
+                                accept="video/*"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    console.log('[admin] source file selected:', file.name, file.type, file.size);
+                                    console.log('[admin] updating relatedVideo with id:', relatedVideo.id);
+                                    updateRelatedVideo(relatedVideo.id, 'videoFile', file);
+                                    
+                                    // Store file directly for upload
+                                    setSourceFiles(prev => [...prev, file]);
+                                    console.log('[admin] sourceFiles updated:', [...sourceFiles, file].map(f => f.name));
+                                    
+                                    // Get video duration
+                                    const video = document.createElement('video');
+                                    video.preload = 'metadata';
+                                    video.onloadedmetadata = () => {
+                                      updateRelatedVideo(relatedVideo.id, 'duration', video.duration);
+                                    };
+                                    video.src = URL.createObjectURL(file);
+                                  }
+                                }}
+                                style={{ width: '100%', fontSize: '14px' }}
+                              />
+                            </Box>
+                            
+                            {/* No per-source thumbnail upload anymore */}
+                            
+                            {relatedVideo.videoFile && (
+                              <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                                Selected: {(relatedVideo.videoFile as File).name}
+                              </Typography>
+                            )}
+                            {relatedVideo.duration && (
+                              <Typography variant="caption" color="text.secondary">
+                                Duration: {Math.floor(relatedVideo.duration / 60)}:{(relatedVideo.duration % 60).toString().padStart(2, '0')}
+                              </Typography>
+                            )}
+                          </Grid>
+                        </Grid>
+                      </Paper>
+                    ))}
+                    
+                    <Button
+                      variant="outlined"
+                      onClick={addRelatedVideo}
+                      startIcon={<AddIcon />}
+                      sx={{ mt: 1 }}
+                    >
+                      Add Another Source
+                    </Button>
+                    <Typography variant="caption" sx={{ display: 'block', mt: 1, color: 'text.secondary' }}>
+                      Sources added: {sourceFiles.length} / {relatedVideos.length}
+                    </Typography>
+                  </Box>
+                )}
+              </Box>
               
               <Box sx={{ display: 'flex', gap: 2, mt: 3 }}>
                 <Button
@@ -1041,6 +1133,8 @@ const Admin: FC = () => {
                     setVideoFile(null);
                     setThumbnailFile(null);
                     setVideoDuration(null);
+                    setRelatedVideos([]);
+                    setShowRelatedVideos(false);
                   }}
                 >
                   Cancel
@@ -1383,7 +1477,7 @@ const Admin: FC = () => {
 
           {/* Display Current Configuration */}
           {!editingConfig && siteConfig && (
-            <Paper sx={{ p: 3 }}>
+            <Paper sx={{ p: 3, mb: 3 }}>
               <Typography variant="h6" component="h3" sx={{ mb: 3 }}>
                 Current Configuration
               </Typography>
@@ -1437,300 +1531,253 @@ const Admin: FC = () => {
               </Grid>
             </Paper>
           )}
-        </TabPanel>
-        
-        {/* Admin Management Tab */}
-        <TabPanel value={tabValue} index={2}>
+
+          {/* Users Management Section */}
           <Box sx={{ mb: 4 }}>
-            <Grid container spacing={2} alignItems="center" justifyContent="space-between">
+            <Grid container spacing={2} alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
               <Grid item>
-                <Typography variant="h5" component="h2" gutterBottom>
-                  Admin Management
+                <Typography variant="h5" component="h2">
+                  <GroupIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
+                  Admin Users Management
                 </Typography>
               </Grid>
               <Grid item>
                 <Button
                   variant="contained"
                   color="primary"
-                  startIcon={<PersonAddIcon />}
-                  onClick={() => setShowAdminForm(!showAdminForm)}
-                  sx={{ mr: 2 }}
+                  startIcon={<AddIcon />}
+                  onClick={() => {
+                    setNewUser(true);
+                    setUserName('');
+                    setUserEmail('');
+                    setUserPassword('');
+                    setEditingUser(null);
+                  }}
                 >
-                  {showAdminForm ? 'Hide Form' : 'Add New Admin'}
-                </Button>
-                <Button
-                  variant="outlined"
-                  color="secondary"
-                  startIcon={<LockIcon />}
-                  onClick={() => setShowChangePasswordForm(!showChangePasswordForm)}
-                >
-                  Change My Password
+                  Add New Admin
                 </Button>
               </Grid>
             </Grid>
-            
-            {error && (
-              <Alert severity="error" sx={{ mb: 2, mt: 2 }}>
-                {error}
-              </Alert>
+
+            {loading && !error ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
+                <CircularProgress />
+              </Box>
+            ) : (
+              <>
+                <TableContainer component={Paper}>
+                  <Table>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Name</TableCell>
+                        <TableCell>Email</TableCell>
+                        <TableCell>Created</TableCell>
+                        <TableCell>Actions</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {users.map((user) => (
+                        <TableRow key={user.$id}>
+                          <TableCell>{user.name}</TableCell>
+                          <TableCell>{user.email}</TableCell>
+                          <TableCell>
+                            {user.created_at ? 
+                              new Date(user.created_at).toLocaleDateString('pt-BR', {
+                                year: 'numeric',
+                                month: '2-digit',
+                                day: '2-digit'
+                              }) : 
+                              'N/A'
+                            }
+                          </TableCell>
+                          <TableCell>
+                            <IconButton 
+                              color="primary" 
+                              onClick={() => {
+                                setUserName(user.name);
+                                setUserEmail(user.email);
+                                setUserPassword('');
+                                setEditingUser(user.$id);
+                                setNewUser(false);
+                              }}
+                              aria-label="edit user"
+                              size="small"
+                              sx={{ mr: 1 }}
+                            >
+                              <EditIcon fontSize="small" />
+                            </IconButton>
+                            <IconButton 
+                              color="error" 
+                              onClick={() => {
+                                setItemToDelete({ type: 'user', id: user.$id });
+                                setDeleteDialogOpen(true);
+                              }}
+                              aria-label="delete user"
+                            >
+                              <DeleteIcon />
+                            </IconButton>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      {users.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={4} align="center">
+                            No admin users found
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </>
             )}
           </Box>
-          
-          {loading && !error ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
-              <CircularProgress />
-            </Box>
-          ) : (
-            <>
-              {/* Admin List */}
-              <TableContainer component={Paper} sx={{ mb: 3 }}>
-                <Table>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Name</TableCell>
-                      <TableCell>Email</TableCell>
-                      <TableCell>Created</TableCell>
-                      <TableCell>Actions</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {adminUsers.map((admin) => (
-                      <TableRow key={admin.$id}>
-                        <TableCell>{admin.name}</TableCell>
-                        <TableCell>{admin.email}</TableCell>
-                        <TableCell>{new Date(admin.created_at).toLocaleDateString()}</TableCell>
-                        <TableCell>
-                          <IconButton 
-                            color="primary" 
-                            onClick={() => {
-                              setAdminName(admin.name);
-                              setAdminEmail(admin.email);
-                              setAdminPassword('');
-                              setConfirmPassword('');
-                              setEditingAdmin(admin.$id);
-                              setShowAdminForm(true);
-                            }}
-                            aria-label="edit admin"
-                            size="small"
-                            sx={{ mr: 1 }}
-                          >
-                            <EditIcon fontSize="small" />
-                          </IconButton>
-                          <IconButton 
-                            color="error" 
-                            onClick={() => {
-                              setItemToDelete({ type: 'user', id: admin.$id });
-                              setDeleteDialogOpen(true);
-                            }}
-                            aria-label="delete admin"
-                            disabled={admin.$id === user?.$id} // Prevent deleting self
-                          >
-                            <DeleteIcon />
-                          </IconButton>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                    {adminUsers.length === 0 && (
-                      <TableRow>
-                        <TableCell colSpan={4} align="center">
-                          No admin users found
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </TableContainer>
 
-              {/* Add/Edit Admin Form */}
-              {showAdminForm && (
-                <Paper sx={{ p: 3, mb: 3 }}>
-                  <Typography variant="h6" component="h3" sx={{ mb: 3 }}>
-                    {editingAdmin ? 'Edit Admin' : 'Add New Admin'}
-                  </Typography>
+          {/* User Form */}
+          {(newUser || editingUser) && (
+            <Paper sx={{ p: 3, mt: 3 }}>
+              <Typography variant="h6" component="h3" sx={{ mb: 3 }}>
+                {newUser ? 'Add New Admin User' : 'Edit Admin User'}
+              </Typography>
+              
+              <Grid container spacing={3}>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    fullWidth
+                    label="Full Name"
+                    value={userName}
+                    onChange={(e) => setUserName(e.target.value)}
+                    variant="outlined"
+                    sx={{ mb: 2 }}
+                    required
+                  />
                   
-                  <Grid container spacing={3}>
-                    <Grid item xs={12} md={6}>
-                      <TextField
-                        fullWidth
-                        label="Admin Name"
-                        value={adminName}
-                        onChange={(e) => setAdminName(e.target.value)}
-                        variant="outlined"
-                        sx={{ mb: 2 }}
-                      />
-                      
-                      <TextField
-                        fullWidth
-                        label="Email"
-                        type="email"
-                        value={adminEmail}
-                        onChange={(e) => setAdminEmail(e.target.value)}
-                        variant="outlined"
-                        sx={{ mb: 2 }}
-                      />
-                    </Grid>
-                    
-                    <Grid item xs={12} md={6}>
-                      <TextField
-                        fullWidth
-                        label="Password"
-                        type="password"
-                        value={adminPassword}
-                        onChange={(e) => setAdminPassword(e.target.value)}
-                        variant="outlined"
-                        sx={{ mb: 2 }}
-                      />
-                      
-                      <TextField
-                        fullWidth
-                        label="Confirm Password"
-                        type="password"
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        variant="outlined"
-                        sx={{ mb: 2 }}
-                      />
-                    </Grid>
-                  </Grid>
+                  <TextField
+                    fullWidth
+                    label="Email Address"
+                    type="email"
+                    value={userEmail}
+                    onChange={(e) => setUserEmail(e.target.value)}
+                    variant="outlined"
+                    sx={{ mb: 2 }}
+                    required
+                  />
                   
-                  <Box sx={{ display: 'flex', gap: 2, mt: 3 }}>
-                    <Button
-                      variant="contained"
-                      color="primary"
-                      onClick={handleSaveAdmin}
-                      disabled={loading || !adminName || !adminEmail || !adminPassword}
-                      startIcon={loading ? <CircularProgress size={20} /> : <SaveIcon />}
-                    >
-                      {loading ? 'Saving...' : (editingAdmin ? 'Update Admin' : 'Create Admin')}
-                    </Button>
-                    
-                    <Button
-                      variant="outlined"
-                      onClick={() => {
-                        setShowAdminForm(false);
-                        setEditingAdmin(null);
-                        setAdminName('');
-                        setAdminEmail('');
-                        setAdminPassword('');
-                        setConfirmPassword('');
-                      }}
-                    >
-                      Cancel
-                    </Button>
-                  </Box>
-                </Paper>
-              )}
-
-              {/* Change Password Form */}
-              {showChangePasswordForm && (
-                <Paper sx={{ p: 3 }}>
-                  <Typography variant="h6" component="h3" sx={{ mb: 3 }}>
-                    Change My Password
-                  </Typography>
-                  
-                  <Grid container spacing={3}>
-                    <Grid item xs={12} md={4}>
-                      <TextField
-                        fullWidth
-                        label="Current Password"
-                        type="password"
-                        value={currentPassword}
-                        onChange={(e) => setCurrentPassword(e.target.value)}
-                        variant="outlined"
-                        sx={{ mb: 2 }}
-                      />
-                    </Grid>
-                    
-                    <Grid item xs={12} md={4}>
-                      <TextField
-                        fullWidth
-                        label="New Password"
-                        type="password"
-                        value={newPassword}
-                        onChange={(e) => setNewPassword(e.target.value)}
-                        variant="outlined"
-                        sx={{ mb: 2 }}
-                      />
-                    </Grid>
-                    
-                    <Grid item xs={12} md={4}>
-                      <TextField
-                        fullWidth
-                        label="Confirm New Password"
-                        type="password"
-                        value={confirmNewPassword}
-                        onChange={(e) => setConfirmNewPassword(e.target.value)}
-                        variant="outlined"
-                        sx={{ mb: 2 }}
-                      />
-                    </Grid>
-                  </Grid>
-                  
-                  <Box sx={{ display: 'flex', gap: 2, mt: 3 }}>
-                    <Button
-                      variant="contained"
-                      color="primary"
-                      onClick={handleChangePassword}
-                      disabled={loading || !currentPassword || !newPassword || !confirmNewPassword}
-                      startIcon={loading ? <CircularProgress size={20} /> : <LockIcon />}
-                    >
-                      {loading ? 'Changing...' : 'Change Password'}
-                    </Button>
-                    
-                    <Button
-                      variant="outlined"
-                      onClick={() => {
-                        setShowChangePasswordForm(false);
-                        setCurrentPassword('');
-                        setNewPassword('');
-                        setConfirmNewPassword('');
-                      }}
-                    >
-                      Cancel
-                    </Button>
-                  </Box>
-                </Paper>
-              )}
-            </>
-          )}
-        </TabPanel>
-        
-        {/* Online Users Tab */}
-        <TabPanel value={tabValue} index={3}>
-          <Box sx={{ mb: 4 }}>
-            <Grid container spacing={3}>
-              <Grid item xs={12} md={6}>
-                <OnlineUsersPanel 
-                  showDetails={true} 
-                  refreshInterval={5000}
-                />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <Card>
-                  <CardContent>
-                    <Typography variant="h6" gutterBottom>
-                      Estatísticas em Tempo Real
+                  <TextField
+                    fullWidth
+                    label="Password"
+                    type="password"
+                    value={userPassword}
+                    onChange={(e) => setUserPassword(e.target.value)}
+                    variant="outlined"
+                    sx={{ mb: 2 }}
+                    required
+                    helperText={editingUser ? "Leave blank to keep current password" : "Enter a secure password"}
+                  />
+                </Grid>
+                
+                <Grid item xs={12} md={6}>
+                  <Alert severity="info" sx={{ mb: 2 }}>
+                    <Typography variant="body2">
+                      <strong>Admin users</strong> have full access to:
                     </Typography>
-                    <Typography variant="body2" color="text.secondary" paragraph>
-                      Monitore quantos usuários estão acessando seu site em tempo real.
-                      Os dados são atualizados automaticamente a cada 5 segundos.
-                    </Typography>
-                    <Box sx={{ mt: 2 }}>
-                      <Typography variant="subtitle2" gutterBottom>
-                        Funcionalidades:
+                    <ul style={{ margin: '8px 0', paddingLeft: '20px' }}>
+                      <li>Manage videos (upload, edit, delete)</li>
+                      <li>Configure site settings</li>
+                      <li>Manage other admin users</li>
+                      <li>Access all administrative functions</li>
+                    </ul>
+                  </Alert>
+                  
+                  {editingUser && (
+                    <Alert severity="warning" sx={{ mb: 2 }}>
+                      <Typography variant="body2">
+                        <strong>Warning:</strong> Changing user credentials will require the user to log in again.
                       </Typography>
-                      <ul>
-                        <li>Contador de usuários online em tempo real</li>
-                        <li>Lista de usuários ativos com timestamps</li>
-                        <li>Status de conexão de cada usuário</li>
-                        <li>Atualização automática dos dados</li>
-                      </ul>
-                    </Box>
-                  </CardContent>
-                </Card>
+                    </Alert>
+                  )}
+                </Grid>
               </Grid>
-            </Grid>
-          </Box>
+              
+              <Box sx={{ display: 'flex', gap: 2, mt: 3 }}>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  onClick={async () => {
+                    try {
+                      setLoading(true);
+                      setError(null);
+
+                      if (!userName || !userEmail || (!userPassword && newUser)) {
+                        showFeedback('Please fill in all required fields', 'error');
+                        return;
+                      }
+
+                      if (newUser) {
+                        // Create new user
+                        const hashedPassword = await hashPasswordWithWebCrypto(userPassword);
+                        const userData = {
+                          name: userName,
+                          email: userEmail,
+                          password_hash: hashedPassword,
+                          role: 'admin'
+                        };
+                        
+                        await SupabaseService.createUser(userData);
+                        showFeedback('Admin user created successfully!', 'success');
+                      } else if (editingUser) {
+                        // Update existing user
+                        const updateData: any = {
+                          name: userName,
+                          email: userEmail
+                        };
+                        
+                        // Only update password if provided
+                        if (userPassword.trim()) {
+                          const hashedPassword = await hashPasswordWithWebCrypto(userPassword);
+                          updateData.password_hash = hashedPassword;
+                        }
+                        
+                        await SupabaseService.updateUser(editingUser, updateData);
+                        showFeedback('Admin user updated successfully!', 'success');
+                      }
+
+                      // Reset form and refresh users
+                      setNewUser(false);
+                      setEditingUser(null);
+                      setUserName('');
+                      setUserEmail('');
+                      setUserPassword('');
+                      fetchUsers();
+                      
+                    } catch (err) {
+                      console.error('Error saving user:', err);
+                      showFeedback('Failed to save user. Please try again.', 'error');
+                    } finally {
+                      setLoading(false);
+                    }
+                  }}
+                  startIcon={<SaveIcon />}
+                  disabled={loading}
+                >
+                  {loading ? 'Saving...' : (newUser ? 'Create Admin User' : 'Update Admin User')}
+                </Button>
+                
+                <Button
+                  variant="outlined"
+                  onClick={() => {
+                    setNewUser(false);
+                    setEditingUser(null);
+                    setUserName('');
+                    setUserEmail('');
+                    setUserPassword('');
+                  }}
+                >
+                  Cancel
+                </Button>
+              </Box>
+            </Paper>
+          )}
         </TabPanel>
       </Paper>
       

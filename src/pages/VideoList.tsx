@@ -8,9 +8,9 @@ import Box from '@mui/material/Box';
 import CircularProgress from '@mui/material/CircularProgress';
 import Alert from '@mui/material/Alert';
 import { Fade, Grow } from '@mui/material';
-// import TextField from '@mui/material/TextField'; // Removed - no longer needed
-// import InputAdornment from '@mui/material/InputAdornment'; // Removed - no longer needed
-// import SearchIcon from '@mui/icons-material/Search'; // Removed - no longer needed
+import TextField from '@mui/material/TextField';
+import InputAdornment from '@mui/material/InputAdornment';
+import SearchIcon from '@mui/icons-material/Search';
 import FormControl from '@mui/material/FormControl';
 import InputLabel from '@mui/material/InputLabel';
 import Select, { SelectChangeEvent } from '@mui/material/Select';
@@ -64,68 +64,6 @@ const VideoCardSkeleton: FC = () => {
   );
 };
 
-// Loading card component with progress indicator
-const VideoCardLoading: FC<{ index: number }> = ({ index }) => {
-  return (
-    <Card sx={{ 
-      height: '100%', 
-      display: 'flex', 
-      flexDirection: 'column',
-      borderRadius: '8px',
-      overflow: 'hidden',
-      boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-      bgcolor: 'background.paper',
-      position: 'relative'
-    }}>
-      {/* Thumbnail area with progress indicator */}
-      <Box sx={{ 
-        width: '100%', 
-        paddingTop: '56.25%', 
-        position: 'relative',
-        bgcolor: 'rgba(0,0,0,0.05)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center'
-      }}>
-        <Box sx={{ 
-          display: 'flex', 
-          flexDirection: 'column', 
-          alignItems: 'center',
-          gap: 2
-        }}>
-          <CircularProgress 
-            size={40} 
-            thickness={4}
-            sx={{ 
-              color: 'primary.main',
-              animation: 'pulse 1.5s ease-in-out infinite'
-            }} 
-          />
-          <Typography 
-            variant="caption" 
-            sx={{ 
-              color: 'text.secondary',
-              fontWeight: 'bold',
-              textAlign: 'center'
-            }}
-          >
-            Loading video {index + 1}...
-          </Typography>
-        </Box>
-      </Box>
-      
-      <CardContent>
-        <Skeleton variant="text" sx={{ fontSize: '1.5rem', mb: 1 }} />
-        <Skeleton variant="text" sx={{ fontSize: '1rem', width: '60%' }} />
-        <Box sx={{ mt: 2, display: 'flex', justifyContent: 'space-between' }}>
-          <Skeleton variant="text" sx={{ width: '30%' }} />
-          <Skeleton variant="text" sx={{ width: '20%' }} />
-        </Box>
-      </CardContent>
-    </Card>
-  );
-};
-
 const VideoList: FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [videos, setVideos] = useState<Video[]>([]);
@@ -138,9 +76,6 @@ const VideoList: FC = () => {
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 100]);
   const [durationFilter, setDurationFilter] = useState<string | null>(null);
   const [showAdultWarning, setShowAdultWarning] = useState(false);
-  const [showLoadingModal, setShowLoadingModal] = useState(false);
-  const [loadedVideos, setLoadedVideos] = useState<Video[]>([]);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
   
   const { user } = useAuth();
   const { siteConfig } = useSiteConfig();
@@ -151,16 +86,6 @@ const VideoList: FC = () => {
     if (!hasSeenWarning) {
       setShowAdultWarning(true);
     }
-  }, []);
-
-  // Show loading modal for 10 seconds when component mounts
-  useEffect(() => {
-    setShowLoadingModal(true);
-    const timer = setTimeout(() => {
-      setShowLoadingModal(false);
-    }, 5000); // 10 seconds
-
-    return () => clearTimeout(timer);
   }, []);
 
   // Update search query when URL params change
@@ -176,167 +101,51 @@ const VideoList: FC = () => {
       try {
         setLoading(true);
         setError(null);
-        setLoadedVideos([]); // Reset loaded videos
-        setVideos([]); // Reset videos array
         
-        // Get video IDs first (ultra-fast operation - no metadata loading)
-        const allVideoIds = await VideoService.getVideoIds(sortOption);
-        
-        // Apply search filter to IDs if needed
-        let filteredIds = allVideoIds;
-        if (debouncedSearchQuery) {
-          // For search, we need to get full videos to filter by title/description
+        // Get all videos at once without pagination
         const allVideos = await VideoService.getAllVideos(sortOption, debouncedSearchQuery);
-          filteredIds = allVideos.map(v => v.$id);
+        
+        console.log('Received videos:', allVideos);
+        
+        // Apply client-side filtering for price range
+        let filteredVideos = allVideos.filter(video => 
+          video.price >= priceRange[0] && video.price <= priceRange[1]
+        );
+        
+        // Apply duration filter if selected
+        if (durationFilter) {
+          filteredVideos = filteredVideos.filter(video => {
+            const duration = video.duration || '00:00';
+            const parts = duration.split(':').map(Number);
+            const seconds = parts.length === 2 
+              ? parts[0] * 60 + parts[1] 
+              : parts[0] * 3600 + parts[1] * 60 + parts[2];
+              
+            switch(durationFilter) {
+              case 'short': // Less than 5 minutes
+                return seconds < 300;
+              case 'medium': // 5-15 minutes
+                return seconds >= 300 && seconds <= 900;
+              case 'long': // More than 15 minutes
+                return seconds > 900;
+              default:
+                return true;
+            }
+          });
         }
         
-        // Set loading to false immediately so skeletons show
-        setLoading(false);
-        
-        // Load videos one by one, starting immediately
-        loadVideosOneByOne(filteredIds);
+        // Set all filtered videos to state
+        setVideos(filteredVideos);
       } catch (err) {
         console.error('Error fetching videos:', err);
         setError('Failed to load videos. Please try again later.');
+      } finally {
         setLoading(false);
       }
     };
     
     fetchVideos();
   }, [user, sortOption, debouncedSearchQuery, priceRange, durationFilter]);
-
-  // Function to load videos one by one (immediate first video)
-  const loadVideosOneByOne = async (videoIds: string[]) => {
-    setIsLoadingMore(true);
-    
-    // Load first 3 videos immediately without delay
-    const immediateVideos = videoIds.slice(0, 3);
-    const remainingVideos = videoIds.slice(3);
-    
-    // Load first 3 videos in parallel for instant display
-    const immediatePromises = immediateVideos.map(async (videoId) => {
-      try {
-        const video = await VideoService.getVideo(videoId);
-        if (video) {
-        // Apply client-side filtering for price range
-          const priceMatch = video.price >= priceRange[0] && video.price <= priceRange[1];
-          
-          // Apply duration filter if selected
-          let durationMatch = true;
-          if (durationFilter) {
-            const duration = video.duration || '00:00';
-            const parts = duration.split(':').map(Number);
-            const seconds = parts.length === 2 
-              ? parts[0] * 60 + parts[1] 
-              : parts[0] * 3600 + parts[1] * 60 + parts[2];
-              
-            switch(durationFilter) {
-              case 'short': // Less than 5 minutes
-                durationMatch = seconds < 300;
-                break;
-              case 'medium': // 5-15 minutes
-                durationMatch = seconds >= 300 && seconds <= 900;
-                break;
-              case 'long': // More than 15 minutes
-                durationMatch = seconds > 900;
-                break;
-              default:
-                durationMatch = true;
-            }
-          }
-          
-          // Only add video if it passes all filters
-          if (priceMatch && durationMatch) {
-            setLoadedVideos(prev => {
-              // Check if video already exists to prevent duplicates
-              if (prev.some(v => v.$id === video.$id)) {
-                return prev;
-              }
-              return [...prev, video];
-            });
-            setVideos(prev => {
-              // Check if video already exists to prevent duplicates
-              if (prev.some(v => v.$id === video.$id)) {
-                return prev;
-              }
-              return [...prev, video];
-            });
-          }
-        }
-      } catch (error) {
-        console.error(`Error loading video ${videoId}:`, error);
-      }
-    });
-    
-    // Wait for first 3 videos to load
-    await Promise.all(immediatePromises);
-    
-    // Load remaining videos one by one with delay
-    for (let i = 0; i < remainingVideos.length; i++) {
-      const videoId = remainingVideos[i];
-      
-      try {
-        // Load individual video
-        const video = await VideoService.getVideo(videoId);
-        
-        if (video) {
-          // Apply client-side filtering for price range
-          const priceMatch = video.price >= priceRange[0] && video.price <= priceRange[1];
-        
-        // Apply duration filter if selected
-          let durationMatch = true;
-        if (durationFilter) {
-            const duration = video.duration || '00:00';
-            const parts = duration.split(':').map(Number);
-            const seconds = parts.length === 2 
-              ? parts[0] * 60 + parts[1] 
-              : parts[0] * 3600 + parts[1] * 60 + parts[2];
-              
-            switch(durationFilter) {
-              case 'short': // Less than 5 minutes
-                durationMatch = seconds < 300;
-                break;
-              case 'medium': // 5-15 minutes
-                durationMatch = seconds >= 300 && seconds <= 900;
-                break;
-              case 'long': // More than 15 minutes
-                durationMatch = seconds > 900;
-                break;
-              default:
-                durationMatch = true;
-            }
-          }
-          
-          // Only add video if it passes all filters
-          if (priceMatch && durationMatch) {
-            // Add video immediately to both arrays, checking for duplicates
-            setLoadedVideos(prev => {
-              // Check if video already exists to prevent duplicates
-              if (prev.some(v => v.$id === video.$id)) {
-                return prev;
-              }
-              return [...prev, video];
-            });
-            setVideos(prev => {
-              // Check if video already exists to prevent duplicates
-              if (prev.some(v => v.$id === video.$id)) {
-                return prev;
-              }
-              return [...prev, video];
-            });
-          }
-        }
-        
-        // Add a small delay between videos
-        await new Promise(resolve => setTimeout(resolve, 150));
-      } catch (error) {
-        console.error(`Error loading video ${videoId}:`, error);
-        // Continue with next video even if current one fails
-      }
-    }
-    
-    setIsLoadingMore(false);
-  };
 
   // Verificação periódica para limpar cache se necessário
   useEffect(() => {
@@ -367,9 +176,9 @@ const VideoList: FC = () => {
     setSortOption(event.target.value as SortOption);
   };
 
-  // const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-  //   setSearchQuery(event.target.value);
-  // }; // Removed - search is now handled by URL params only
+  const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(event.target.value);
+  };
   
   const handlePriceRangeChange = (event: Event, newValue: number | number[]) => {
     setPriceRange(newValue as [number, number]);
@@ -392,49 +201,15 @@ const VideoList: FC = () => {
 
   // Render skeleton loaders during loading state
   const renderSkeletons = () => {
-    // Show skeletons for videos that haven't loaded yet
-    const totalExpectedVideos = 24; // Show more skeletons for video list
-    const loadedCount = loadedVideos.length;
-    const skeletonCount = Math.max(0, totalExpectedVideos - loadedCount);
-    
-    return Array(skeletonCount).fill(0).map((_, index) => (
+    return Array(12).fill(0).map((_, index) => (
       <Grid item key={`skeleton-${index}`} xs={12} sm={6} md={4} lg={3}>
         <VideoCardSkeleton />
       </Grid>
     ));
   };
 
-  // Render loading cards with progress indicators
-  const renderLoadingCards = () => {
-    // Show loading cards for videos that are currently being loaded
-    const totalExpectedVideos = 24;
-    const loadedCount = loadedVideos.length;
-    const loadingCount = Math.max(0, totalExpectedVideos - loadedCount);
-    
-    return Array(loadingCount).fill(0).map((_, index) => (
-      <Grid item key={`loading-${index}`} xs={12} sm={6} md={4} lg={3}>
-        <VideoCardLoading index={loadedCount + index} />
-      </Grid>
-    ));
-  };
-
   return (
     <>
-    {/* Add CSS animations for loading modal and cards */}
-    <style>
-      {`
-        @keyframes pulse {
-          0% { opacity: 1; }
-          50% { opacity: 0.7; }
-          100% { opacity: 1; }
-        }
-        @keyframes loadingBar {
-          0% { transform: translateX(-100%); }
-          100% { transform: translateX(100%); }
-        }
-      `}
-    </style>
-    
     <Container maxWidth="lg" sx={{ py: 4 }}>
       {/* Adult Content Warning Modal */}
       <Modal
@@ -488,71 +263,6 @@ const VideoList: FC = () => {
                 Enter (18+)
               </Button>
             </Box>
-          </Box>
-        </Fade>
-      </Modal>
-
-      {/* Loading Modal */}
-      <Modal
-        open={showLoadingModal}
-        closeAfterTransition
-        BackdropComponent={Backdrop}
-        BackdropProps={{
-          timeout: 500,
-        }}
-        aria-labelledby="loading-modal"
-      >
-        <Fade in={showLoadingModal}>
-          <Box sx={{
-            position: 'absolute',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            width: { xs: '90%', sm: '400px' },
-            bgcolor: 'background.paper',
-            borderRadius: 2,
-            boxShadow: 24,
-            p: 4,
-            textAlign: 'center',
-          }}>
-            <CircularProgress 
-              size={60} 
-              thickness={4}
-              sx={{ 
-                color: 'primary.main',
-                mb: 3,
-                animation: 'pulse 1.5s ease-in-out infinite'
-              }} 
-            />
-            
-            <Typography variant="h5" component="h2" sx={{ fontWeight: 'bold', mb: 2 }}>
-              Loading Videos
-            </Typography>
-            
-            <Typography variant="body1" sx={{ mb: 3, color: 'text.secondary' }}>
-              Please wait while we load the latest videos for you...
-            </Typography>
-            
-            <Box sx={{ 
-              width: '100%', 
-              height: 4, 
-              backgroundColor: 'rgba(0,0,0,0.1)', 
-              borderRadius: 2,
-              overflow: 'hidden',
-              mb: 2
-            }}>
-              <Box sx={{
-                width: '100%',
-                height: '100%',
-                background: 'linear-gradient(90deg, #FF0F50 0%, #D10D42 100%)',
-                borderRadius: 2,
-                animation: 'loadingBar 10s linear infinite'
-              }} />
-            </Box>
-            
-            <Typography variant="caption" color="text.secondary">
-              This will only take a moment...
-            </Typography>
           </Box>
         </Fade>
       </Modal>
@@ -613,10 +323,27 @@ const VideoList: FC = () => {
         
         <Box sx={{ 
           display: 'flex', 
-          gap: 1,
-          alignItems: 'center',
+          flexDirection: { xs: 'column', sm: 'row' }, 
+          gap: 2,
+          width: { xs: '100%', md: 'auto' },
           mt: { xs: 2, md: 0 }
         }}>
+          <TextField
+            placeholder="Search videos..."
+            size="small"
+            value={searchQuery}
+            onChange={handleSearchChange}
+            sx={{ minWidth: { xs: '100%', sm: '200px' } }}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon />
+                </InputAdornment>
+              ),
+            }}
+          />
+          
+          <Box sx={{ display: 'flex', gap: 1 }}>
             <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: '150px' } }}>
               <InputLabel id="sort-select-label">Sort By</InputLabel>
               <Select
@@ -642,6 +369,7 @@ const VideoList: FC = () => {
             >
               Filters
             </Button>
+          </Box>
         </Box>
       </Box>
       
@@ -719,56 +447,50 @@ const VideoList: FC = () => {
         </Alert>
       )}
       
-      <Fade in={!loading} timeout={500}>
-        <Box>
-          {loading ? (
-            <Grid container spacing={3}>
-              {renderSkeletons()}
-            </Grid>
-          ) : videos.length === 0 && !isLoadingMore ? (
-            <Grow in={true} timeout={1000}>
-              <Paper sx={{ 
-                p: 4, 
-                my: 3, 
-                textAlign: 'center',
-                borderRadius: 2,
-                background: 'linear-gradient(135deg, rgba(255, 15, 80, 0.05) 0%, rgba(209, 13, 66, 0.05) 100%)'
-              }}>
-                <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
-                  No videos found
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {searchQuery 
-                    ? `No videos matching "${searchQuery}". Try a different search term.` 
-                    : (showFilters 
-                      ? 'No videos match your current filters. Try adjusting your filter settings.' 
-                      : 'No videos available at the moment. Please check back later.')}
-                </Typography>
-              </Paper>
-            </Grow>
+      <Box>
+        {loading ? (
+          <Grid container spacing={3}>
+            {renderSkeletons()}
+          </Grid>
+        ) : videos.length === 0 ? (
+          <Grow in={true} timeout={1000}>
+            <Paper sx={{ 
+              p: 4, 
+              my: 3, 
+              textAlign: 'center',
+              borderRadius: 2,
+              background: 'linear-gradient(135deg, rgba(255, 15, 80, 0.05) 0%, rgba(209, 13, 66, 0.05) 100%)'
+            }}>
+              <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
+                No videos found
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {searchQuery 
+                  ? `No videos matching "${searchQuery}". Try a different search term.` 
+                  : (showFilters 
+                    ? 'No videos match your current filters. Try adjusting your filter settings.' 
+                    : 'No videos available at the moment. Please check back later.')}
+              </Typography>
+            </Paper>
+          </Grow>
           ) : (
             <>
               <Grid container spacing={3}>
-                {/* Show loaded videos with smooth animation */}
-                {loadedVideos.map((video, index) => (
+                {videos.map((video, index) => (
                   <Grow
                     key={video.$id}
                     in={true}
-                    timeout={200}
+                    timeout={300 + index * 50}
                   >
                     <Grid item xs={12} sm={6} md={4} lg={3}>
                       <VideoCard video={video} />
                     </Grid>
                   </Grow>
                 ))}
-                
-                {/* Show loading cards with progress indicators for remaining videos */}
-                {isLoadingMore && renderLoadingCards()}
               </Grid>
             </>
           )}
-        </Box>
-      </Fade>
+      </Box>
     </Container>
     
     <ContactSection />

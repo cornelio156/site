@@ -1,23 +1,20 @@
-import { FC, useState, useEffect, useRef } from 'react';
+import { FC, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import CardMedia from '@mui/material/CardMedia';
 import Typography from '@mui/material/Typography';
-import { Chip, CircularProgress, Button, IconButton, Tooltip, Dialog, DialogTitle, DialogContent, DialogActions, Divider } from '@mui/material';
+import { Chip, CircularProgress, Button } from '@mui/material';
 import Box from '@mui/material/Box';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
-import LockIcon from '@mui/icons-material/Lock';
-import Skeleton from '@mui/material/Skeleton';
 import TelegramIcon from '@mui/icons-material/Telegram';
-import PreviewIcon from '@mui/icons-material/PlayCircleOutline';
 import CreditCardIcon from '@mui/icons-material/CreditCard';
+import Skeleton from '@mui/material/Skeleton';
 import { VideoService } from '../services/VideoService';
 import { useSiteConfig } from '../context/SiteConfigContext';
 import { StripeService } from '../services/StripeService';
-import ThumbnailFallback from './ThumbnailFallback';
+import MultiVideoPreview from './MultiVideoPreview';
 
 interface VideoCardProps {
   video: {
@@ -31,44 +28,24 @@ interface VideoCardProps {
     views?: number;
     createdAt?: string;
     created_at?: string;
-    product_link?: string;
+    // Support for multiple videos in preview
+    relatedVideos?: Array<{
+      $id: string;
+      title: string;
+      thumbnailUrl?: string;
+      duration?: string | number;
+      price: number;
+    }>;
   };
 }
 
 const VideoCard: FC<VideoCardProps> = ({ video }) => {
   const navigate = useNavigate();
-  const { telegramUsername, stripePublishableKey } = useSiteConfig();
   const [isHovered, setIsHovered] = useState(false);
   const [isThumbnailLoading, setIsThumbnailLoading] = useState(true);
   const [thumbnailError, setThumbnailError] = useState(false);
-  const [isVideoLoading, setIsVideoLoading] = useState(false);
-  const [videoUrl, setVideoUrl] = useState<string | null>(null);
-  const [isPlayingInline, setIsPlayingInline] = useState(false);
-  const [showTapHint, setShowTapHint] = useState(true);
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-
-  // Ensure only one card plays at a time
-  useEffect(() => {
-    const onAnyCardPlay = (e: Event) => {
-      try {
-        const custom = e as CustomEvent<{ id: string }>;
-        if (custom.detail && custom.detail.id !== video.$id) {
-          // Stop this card if another started
-          if (videoRef.current) {
-            try { videoRef.current.pause(); } catch {}
-          }
-          setIsPlayingInline(false);
-          setVideoUrl(null);
-        }
-      } catch {
-        // ignore
-      }
-    };
-    window.addEventListener('videocard-play', onAnyCardPlay as EventListener);
-    return () => window.removeEventListener('videocard-play', onAnyCardPlay as EventListener);
-  }, [video.$id]);
-  const [stripeLoading, setStripeLoading] = useState(false);
-  const [privacyDialogOpen, setPrivacyDialogOpen] = useState(false);
+  const { telegramUsername, stripePublishableKey } = useSiteConfig();
+  const [isStripeLoading, setIsStripeLoading] = useState(false);
   
   const handleCardClick = async () => {
     try {
@@ -81,108 +58,6 @@ const VideoCard: FC<VideoCardProps> = ({ video }) => {
       console.error('Error handling video card click:', error);
       // Navigate anyway even if incrementing views fails
       navigate(`/video/${video.$id}`);
-    }
-  };
-
-  const handlePreviewClick = (e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent card click
-    // Navigate to video page for preview
-    navigate(`/video/${video.$id}`);
-  };
-
-  const openInlinePlayer = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    try {
-      // Notify other cards to stop
-      window.dispatchEvent(new CustomEvent('videocard-play', { detail: { id: video.$id } }));
-      setShowTapHint(false);
-      setIsVideoLoading(true);
-      const url = await VideoService.getVideoFileUrl(video.$id);
-      setVideoUrl(url);
-      setIsPlayingInline(true);
-    } catch (err) {
-      console.error('Failed to load video URL for inline play', err);
-    } finally {
-      setIsVideoLoading(false);
-    }
-  };
-
-  const stopInlinePlayer = (e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
-    if (videoRef.current) {
-      try { videoRef.current.pause(); } catch {}
-    }
-    setIsPlayingInline(false);
-    setVideoUrl(null);
-    setShowTapHint(true);
-  };
-
-  const handleOpenPrivacyDialog = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setPrivacyDialogOpen(true);
-  };
-
-  const handleDialogClose = (
-    _event: object,
-    _reason: 'backdropClick' | 'escapeKeyDown'
-  ) => {
-    if (!stripeLoading) setPrivacyDialogOpen(false);
-  };
-
-  const handleCancelPrivacyDialog = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!stripeLoading) setPrivacyDialogOpen(false);
-  };
-
-  const proceedToStripeCheckout = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!stripePublishableKey) {
-      console.warn('Stripe key not configured');
-      return;
-    }
-    try {
-      setStripeLoading(true);
-      // Keep dialog open while processing, to avoid accidental clicks on the card beneath
-      await StripeService.initStripe(stripePublishableKey);
-      const successUrl = `${window.location.origin}/#/video/${video.$id}?payment_success=true&session_id={CHECKOUT_SESSION_ID}`;
-      const cancelUrl = `${window.location.origin}/#/videos?payment_canceled=true`;
-      const sessionId = await StripeService.createCheckoutSession(
-        video.price,
-        'usd',
-        'Premium Content',
-        successUrl,
-        cancelUrl
-      );
-      await StripeService.redirectToCheckout(sessionId);
-    } catch (err) {
-      console.error('Stripe checkout failed', err);
-    } finally {
-      setStripeLoading(false);
-      setPrivacyDialogOpen(false);
-    }
-  };
-
-  const handleTelegramClick = (e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent card click
-    if (telegramUsername) {
-      // Criar mensagem detalhada com informações do vídeo
-      const videoDetails = `
-🎬 *${video.title}*
-
-💰 *Price:* $${video.price.toFixed(2)}
-⏱️ *Duration:* ${video.duration ? formatDuration(video.duration) : 'N/A'}
-👀 *Views:* ${formatViews(video.views)}
-📅 *Added:* ${(video.createdAt || video.created_at) ? formatDate(typeof (video.createdAt || video.created_at) === 'string' ? (video.createdAt || video.created_at!) : (video.createdAt || video.created_at!).toString()) : 'N/A'}
-
-📝 *Description:*
-${video.description || 'No description available'}
-      `.trim();
-
-      // Codificar a mensagem para URL
-      const encodedMessage = encodeURIComponent(videoDetails);
-      
-      // Abrir Telegram com a mensagem pré-formatada
-      window.open(`https://t.me/${telegramUsername}?text=${encodedMessage}`, '_blank');
     }
   };
 
@@ -252,35 +127,121 @@ ${video.description || 'No description available'}
       setThumbnailError(false);
     } else {
       setIsThumbnailLoading(false);
-      setThumbnailError(true);
     }
   }, [video.thumbnailUrl]);
 
   const handleThumbnailLoad = () => {
-    console.log(`Thumbnail loaded successfully for video: ${video.title}`);
     setIsThumbnailLoading(false);
-    setThumbnailError(false);
   };
 
-  const onThumbnailError = () => {
-    console.warn(`Thumbnail failed to load for video: ${video.title}`);
-    setThumbnailError(true);
+  const handleThumbnailError = () => {
     setIsThumbnailLoading(false);
+    setThumbnailError(true);
+  };
+
+  const handlePreviewClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigate(`/video/${video.$id}`);
+  };
+
+  const handleTelegramClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    // Format date for "Added" field
+    const formatAddedDate = (date: Date) => {
+      const now = new Date();
+      const diffTime = Math.abs(now.getTime() - date.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      if (diffDays === 1) return '1 day ago';
+      if (diffDays < 7) return `${diffDays} days ago`;
+      if (diffDays < 30) return `${Math.ceil(diffDays / 7)} weeks ago`;
+      return `${Math.ceil(diffDays / 30)} months ago`;
+    };
+    
+    const msg = `🎬 **${video.title}**
+
+💰 **Price:** $${video.price.toFixed(2)}
+⏱️ **Duration:** ${formatDuration(video.duration)}
+👀 **Views:** ${formatViews(video.views)}
+📅 **Added:** ${formatAddedDate(new Date(video.createdAt || video.created_at || Date.now()))}
+
+📝 **Description:**
+${video.description || 'No description available'}
+
+Please let me know how to proceed with payment.`;
+    
+    const encoded = encodeURIComponent(msg);
+    const base = telegramUsername ? `https://t.me/${telegramUsername.replace('@', '')}` : 'https://t.me/share/url';
+    const url = telegramUsername ? `${base}?text=${encoded}` : `${base}?text=${encoded}`;
+    window.open(url, '_blank');
+  };
+
+  // Create Telegram href for the button
+  const telegramHref = (() => {
+    if (!telegramUsername) return 'https://t.me/share/url';
+    
+    // Format date for "Added" field
+    const formatAddedDate = (date: Date) => {
+      const now = new Date();
+      const diffTime = Math.abs(now.getTime() - date.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      if (diffDays === 1) return '1 day ago';
+      if (diffDays < 7) return `${diffDays} days ago`;
+      if (diffDays < 30) return `${Math.ceil(diffDays / 7)} weeks ago`;
+      return `${Math.ceil(diffDays / 30)} months ago`;
+    };
+    
+    const msg = `🎬 **${video.title}**
+
+💰 **Price:** $${video.price.toFixed(2)}
+⏱️ **Duration:** ${formatDuration(video.duration)}
+👀 **Views:** ${formatViews(video.views)}
+📅 **Added:** ${formatAddedDate(new Date(video.createdAt || video.created_at || Date.now()))}
+
+📝 **Description:**
+${video.description || 'No description available'}
+
+Please let me know how to proceed with payment.`;
+    
+    const encoded = encodeURIComponent(msg);
+    return `https://t.me/${telegramUsername.replace('@', '')}?text=${encoded}`;
+  })();
+
+  const handleStripePay = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!stripePublishableKey) return;
+    try {
+      setIsStripeLoading(true);
+      await StripeService.initStripe(stripePublishableKey);
+      const productName = 'Video Access';
+      const successUrl = `${window.location.origin}/payment-success?video_id=${video.$id}&session_id={CHECKOUT_SESSION_ID}&payment_method=stripe`;
+      const cancelUrl = `${window.location.origin}/video/${video.$id}?payment_canceled=true`;
+      const sessionId = await StripeService.createCheckoutSession(
+        video.price,
+        'usd',
+        productName,
+        successUrl,
+        cancelUrl
+      );
+      await StripeService.redirectToCheckout(sessionId);
+    } catch (err) {
+      console.error('Stripe payment error:', err);
+    } finally {
+      setIsStripeLoading(false);
+    }
   };
 
   return (
     <>
-      {/* Add CSS animations */}
+      {/* Add CSS animation for pulse effect */}
       <style>
         {`
           @keyframes pulse {
             0% { opacity: 1; }
             50% { opacity: 0.7; }
             100% { opacity: 1; }
-          }
-          @keyframes shimmer {
-            0% { transform: translateX(-100%); }
-            100% { transform: translateX(100%); }
           }
         `}
       </style>
@@ -295,12 +256,12 @@ ${video.description || 'No description available'}
           overflow: 'hidden',
           boxShadow: theme => `0 8px 20px ${theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.4)' : 'rgba(0,0,0,0.15)'}`,
           cursor: 'pointer',
-          backgroundColor: theme => theme.palette.mode === 'dark' ? '#121212' : '#ffffff',
-          border: '1px solid rgba(255,15,80,0.1)',
+          backgroundColor: '#1a1a1a',
+          border: '1px solid rgba(142,36,170,0.2)',
           '&:hover': {
-            transform: { xs: 'none', sm: 'translateY(-10px) scale(1.02)' },
-            boxShadow: { xs: '0 8px 20px rgba(0,0,0,0.15)', sm: '0 16px 30px rgba(0,0,0,0.25)' },
-            borderColor: '#FF0F50',
+            transform: 'translateY(-10px) scale(1.02)',
+            boxShadow: '0 16px 30px rgba(142,36,170,0.3)',
+            borderColor: '#8e24aa',
           }
         }}
         onClick={handleCardClick}
@@ -308,7 +269,31 @@ ${video.description || 'No description available'}
         onMouseLeave={() => setIsHovered(false)}
       >
       <Box sx={{ position: 'relative', paddingTop: '56.25%' /* 16:9 aspect ratio */ }}>
-        {/* Thumbnail image */}
+        {/* Multi-video preview (from previewSources) or single thumbnail */}
+        {(video as any).previewSources && (video as any).previewSources.length > 0 ? (
+          <Box sx={{ 
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+          }}>
+            <MultiVideoPreview
+              videos={[(video as any).previewSources].flat().slice(0,3).map((src: any, idx: number) => ({
+                $id: `${video.$id}::${src.id}`,
+                title: video.title,
+                thumbnailUrl: src.thumbnail_file_id ? undefined : video.thumbnailUrl,
+                duration: video.duration,
+                price: video.price
+              }))}
+              onVideoClick={(videoId) => navigate(`/video/${videoId}`)}
+              autoPlay={isHovered}
+              showControls={isHovered}
+            />
+          </Box>
+        ) : (
+          <>
+            {/* Single thumbnail image */}
         {video.thumbnailUrl && !thumbnailError ? (
           <CardMedia
             component="img"
@@ -325,7 +310,7 @@ ${video.description || 'No description available'}
               filter: 'brightness(0.9)',
             }}
             onLoad={handleThumbnailLoad}
-            onError={onThumbnailError}
+            onError={handleThumbnailError}
           />
         ) : (
           <Skeleton 
@@ -340,6 +325,8 @@ ${video.description || 'No description available'}
             }} 
             animation="wave" 
           />
+            )}
+          </>
         )}
 
         {/* Loading indicator overlay */}
@@ -363,7 +350,7 @@ ${video.description || 'No description available'}
               size={40} 
               thickness={4}
               sx={{ 
-                color: '#FF0F50',
+                color: '#8e24aa',
                 mb: 1,
                 animation: 'pulse 1.5s ease-in-out infinite'
               }} 
@@ -384,11 +371,32 @@ ${video.description || 'No description available'}
 
         {/* Error state overlay */}
         {thumbnailError && (
-          <ThumbnailFallback 
-            width="100%"
-            height="100%"
-            title={video.title}
-          />
+          <Box
+            sx={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              backgroundColor: '#0A0A0A',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 3,
+            }}
+          >
+            <Typography 
+              variant="body2" 
+              sx={{ 
+                color: '#666',
+                textAlign: 'center',
+                fontSize: '0.9rem'
+              }}
+            >
+              Video Thumbnail
+            </Typography>
+          </Box>
         )}
         
         {/* Adult content indicator */}
@@ -399,7 +407,7 @@ ${video.description || 'No description available'}
             position: 'absolute', 
             top: 8, 
             left: 8, 
-            backgroundColor: '#FF0F50',
+            backgroundColor: '#8e24aa',
             color: 'white',
             fontWeight: 'bold',
             fontSize: '0.7rem',
@@ -408,7 +416,7 @@ ${video.description || 'No description available'}
           }}
         />
         
-        {/* Hover overlay and inline playback area */}
+        {/* Hover overlay without central play/lock icon */}
         <Box
           sx={{
             position: 'absolute',
@@ -416,65 +424,11 @@ ${video.description || 'No description available'}
             left: 0,
             width: '100%',
             height: '100%',
-            background: isPlayingInline ? 'transparent' : 'linear-gradient(to top, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.3) 50%, rgba(0,0,0,0.3) 100%)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            opacity: isPlayingInline ? 1 : (isHovered ? 1 : 0.4),
+            background: 'linear-gradient(to top, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.25) 50%, rgba(0,0,0,0.25) 100%)',
+            opacity: isHovered ? 1 : 0.4,
             transition: 'all 0.3s ease',
           }}
-        >
-          {isPlayingInline && videoUrl ? (
-            <video
-              src={videoUrl}
-              controls
-              autoPlay
-              ref={videoRef}
-              onClick={(e) => e.stopPropagation()}
-              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-            />
-          ) : (
-            <Box onClick={openInlinePlayer} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.75, cursor: 'pointer' }}>
-              <Box
-                sx={{
-                  width: '70px',
-                  height: '70px',
-                  borderRadius: '50%',
-                  backgroundColor: 'rgba(255,15,80,0.75)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  transform: isHovered ? 'scale(1.1)' : 'scale(0.9)',
-                  transition: 'all 0.3s ease',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.35)'
-                }}
-              >
-                <PlayArrowIcon sx={{ fontSize: 45, color: 'white' }} />
-              </Box>
-              {showTapHint && (
-                <Box
-                  sx={{
-                    backgroundColor: 'rgba(0,0,0,0.6)',
-                    color: 'white',
-                    px: 1,
-                    py: 0.4,
-                    borderRadius: 999,
-                    fontSize: '0.8rem',
-                    fontWeight: 800,
-                    letterSpacing: 0.4,
-                    lineHeight: 1,
-                    textTransform: 'uppercase',
-                    boxShadow: '0 2px 6px rgba(0,0,0,0.35)',
-                    transition: 'opacity 180ms ease',
-                    opacity: showTapHint ? 1 : 0,
-                  }}
-                >
-                  Tap to play
-                </Box>
-              )}
-            </Box>
-          )}
-        </Box>
+        />
         
         {/* Duration badge */}
         {video.duration && (
@@ -497,39 +451,29 @@ ${video.description || 'No description available'}
           />
         )}
         
-        {/* Price badge - Enhanced visibility */}
+        {/* Price badge - Pink/Red style */}
         <Chip 
           label={`$${video.price.toFixed(2)}`} 
-          color="primary" 
           size="medium" 
           sx={{ 
             position: 'absolute', 
             top: 8, 
             right: 8, 
             fontWeight: 'bold',
-            fontSize: '1rem',
-            height: '36px',
-            boxShadow: '0 6px 16px rgba(255, 15, 80, 0.5)',
+            fontSize: '0.9rem',
+            height: '32px',
             backgroundColor: '#FF0F50',
-            border: '3px solid rgba(255, 255, 255, 0.4)',
-            backdropFilter: 'blur(10px)',
+            border: '2px solid rgba(255, 255, 255, 0.3)',
             '& .MuiChip-label': {
               color: 'white',
               fontWeight: 'bold',
-              px: 2,
-              textShadow: '0 1px 2px rgba(0,0,0,0.3)'
-            },
-            '&:hover': {
-              backgroundColor: '#D10D42',
-              transform: 'scale(1.08)',
-              boxShadow: '0 8px 20px rgba(255, 15, 80, 0.6)',
-              transition: 'all 0.3s ease'
+              px: 1.5
             }
           }}
         />
       </Box>
       
-      <CardContent sx={{ flexGrow: 1, p: { xs: 1.25, md: 2 }, pt: { xs: 1, md: 1.5 } }}>
+      <CardContent sx={{ flexGrow: 1, p: 2, pt: 1.5 }}>
         <Typography gutterBottom variant="h6" component="div" sx={{
           fontWeight: 'bold',
           fontSize: '1rem',
@@ -541,13 +485,13 @@ ${video.description || 'No description available'}
           display: '-webkit-box',
           WebkitLineClamp: 2,
           WebkitBoxOrient: 'vertical',
-          color: theme => theme.palette.mode === 'dark' ? 'white' : 'black',
+          color: 'white',
         }}>
           {video.title}
         </Typography>
         
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: theme => theme.palette.mode === 'dark' ? '#FF69B4' : '#FF0F50' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: '#ccc' }}>
             <VisibilityIcon sx={{ fontSize: 16 }} />
             <Typography variant="caption">
               {formatViews(video.views)}
@@ -555,193 +499,68 @@ ${video.description || 'No description available'}
           </Box>
           
           {createdAtField && (
-            <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+            <Typography variant="caption" sx={{ color: '#ccc' }}>
               {formatDate(createdAtField)}
             </Typography>
           )}
         </Box>
 
-        {/* Price chip movido para a linha de ações */}
-
-        {/* Action buttons after price (linha dos botões secundários) */}
-        <Box sx={{ 
-          display: 'flex', 
-          gap: 1, 
-          justifyContent: 'flex-start',
-          alignItems: 'center',
-          mt: { xs: 1, md: 1.5 },
-          px: { xs: 0.5, md: 1 },
-          minHeight: { xs: 36, md: 44 } // garante altura consistente da linha de botões
-        }}>
-          <Box sx={{ display: 'flex', gap: { xs: 1, md: 1 }, alignItems: 'center', flexGrow: 1 }}>
-
-            {/* Preview button */}
-            <Tooltip title="Preview" arrow>
-              <Button
-                variant="contained"
-                size="small"
-                onClick={handlePreviewClick}
-                startIcon={<VisibilityIcon sx={{ fontSize: 18 }} />}
-                sx={{
-                  background: 'linear-gradient(90deg, #6A00FF 0%, #9B00FF 100%)',
-                  color: '#ffffff',
-                  fontWeight: 900,
-                  letterSpacing: 0.2,
-                  fontSize: { xs: '0.9rem', md: '0.8rem' },
-                  minWidth: { xs: 120, md: 'auto' },
-                  px: { xs: 2, md: 1.6 },
-                  py: { xs: 0.7, md: 0.6 },
-                  borderRadius: 1.5,
-                  boxShadow: '0 6px 14px rgba(107, 0, 255, 0.25)',
-                  '&:hover': {
-                    background: 'linear-gradient(90deg, #5E00E6 0%, #8C00E6 100%)',
-                    transform: 'translateY(-1px)'
-                  }
-                }}
-              >
-                Preview
-              </Button>
-            </Tooltip>
-
-            {/* Get content button (product link) visible when purchased and link exists */}
-            {video.isPurchased && video.product_link && (
-              <Tooltip title="Get content" arrow>
-                <Button
-                  variant="contained"
-                  size="small"
-                  onClick={(e) => { e.stopPropagation(); window.open(video.product_link as string, '_blank'); }}
-                  sx={{
-                    backgroundColor: 'rgba(33, 150, 243, 0.9)',
-                    color: 'white',
-                    fontWeight: 'bold',
-                    fontSize: '0.75rem',
-                    minWidth: 'auto',
-                px: { xs: 1, md: 1.5 },
-                py: { xs: 0.4, md: 0.5 },
-                    '&:hover': {
-                      backgroundColor: 'rgba(33, 150, 243, 1)',
-                      transform: 'scale(1.05)'
-                    }
-                  }}
-                >
-                  Get Content
-                </Button>
-              </Tooltip>
-            )}
-
-            {/* Telegram button */}
-            {telegramUsername && (
-              <Tooltip title="Contact on Telegram" arrow>
-                <Button
-                  variant="contained"
-                  size="small"
-                  onClick={handleTelegramClick}
-                  startIcon={<TelegramIcon sx={{ fontSize: 18 }} />}
-                  sx={{
-                    background: 'linear-gradient(90deg, #6A00FF 0%, #9B00FF 100%)',
-                    color: '#ffffff',
-                    fontWeight: 900,
-                    letterSpacing: 0.2,
-                    fontSize: { xs: '0.9rem', md: '0.8rem' },
-                    minWidth: { xs: 120, md: 'auto' },
-                    px: { xs: 2, md: 1.6 },
-                    py: { xs: 0.7, md: 0.6 },
-                    borderRadius: 1.5,
-                    boxShadow: '0 6px 14px rgba(107, 0, 255, 0.25)',
-                    '&:hover': {
-                      background: 'linear-gradient(90deg, #5E00E6 0%, #8C00E6 100%)',
-                      transform: 'translateY(-1px)'
-                    }
-                  }}
-                >
-                  Telegram
-                </Button>
-              </Tooltip>
-            )}
-          </Box>
-
-          {/* Price chip à direita */}
-          <Box sx={{ 
-            display: 'flex', 
-            alignItems: 'center',
-            px: 1,
-            py: 0.4,
-            background: 'rgba(255, 15, 80, 0.08)',
-            borderRadius: 999,
-            border: '1px solid rgba(255, 15, 80, 0.35)',
-            transform: { xs: 'scale(0.95)', md: 'none' },
-            ml: 'auto'
-          }}>
-            <Typography component="span" sx={{ color: '#FF0F50', fontWeight: 900, fontSize: '0.85rem', letterSpacing: 0.2, lineHeight: 1 }}>
-              ${video.price.toFixed(2)}
-            </Typography>
-          </Box>
-        </Box>
-
-        {/* Botão Pay em uma linha separada abaixo dos demais */}
-        <Box sx={{ mt: 1.5, px: 1 }}>
-          {stripePublishableKey ? (
-            <Button
-              fullWidth
-              variant="contained"
-              size="large"
-              onClick={handleOpenPrivacyDialog}
-              disabled={stripeLoading}
-              startIcon={<CreditCardIcon />}
-              sx={{
-                background: 'linear-gradient(90deg, #6A00FF 0%, #9B00FF 100%)',
-                color: '#ffffff',
-                fontWeight: 900,
-                letterSpacing: 0.4,
-                py: 1.1,
-                boxShadow: '0 10px 20px rgba(107, 0, 255, 0.35)',
-                '&:hover': {
-                  background: 'linear-gradient(90deg, #5E00E6 0%, #8C00E6 100%)',
-                  transform: 'translateY(-1px)'
-                }
-              }}
-            >
-              {stripeLoading ? 'Processing…' : 'Pay'}
-            </Button>
-          ) : (
-            // Espaço reservado para manter altura igual entre cards quando Stripe não está ativo
-            <Box sx={{ height: 48 }} />
-          )}
-        </Box>
-      </CardContent>
-      </Card>
-      
-      {/* Privacy confirmation dialog shown before redirecting to Stripe */}
-      <Dialog
-        open={privacyDialogOpen}
-        onClose={handleDialogClose}
-        onClick={(e) => e.stopPropagation()}
-        fullWidth
-        maxWidth="xs"
-      >
-        <DialogTitle sx={{ fontWeight: 800 }}>Privacy Notice</DialogTitle>
-        <Divider />
-        <DialogContent>
-          <Typography variant="body2" sx={{ mt: 1.5 }}>
-            For privacy reasons, a generic merchant name will appear at checkout.
-          </Typography>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={handleCancelPrivacyDialog} color="inherit" disabled={stripeLoading}>
-            Cancel
+        {/* Actions: Preview and Telegram */}
+        <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
+          <Button
+            variant="contained"
+            fullWidth
+            startIcon={<VisibilityIcon />}
+            onClick={handlePreviewClick}
+            sx={{
+              backgroundColor: '#8e24aa',
+              color: 'white',
+              '&:hover': {
+                backgroundColor: '#6a1b9a',
+              }
+            }}
+          >
+            Preview
           </Button>
           <Button
-            onClick={proceedToStripeCheckout}
             variant="contained"
-            disabled={stripeLoading}
-            startIcon={<CreditCardIcon />}
+            fullWidth
+            startIcon={<TelegramIcon />}
+            href={telegramHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            sx={{
+              backgroundColor: '#8e24aa',
+              color: 'white',
+              fontWeight: 'bold',
+              '&:hover': {
+                backgroundColor: '#6a1b9a',
+              }
+            }}
           >
-            {stripeLoading ? 'Processing…' : 'Continue to payment'}
+            Telegram
           </Button>
-        </DialogActions>
-      </Dialog>
-      
-      {/* Inline playback handled within thumbnail overlay; no modal */}
+          <Button
+            variant="contained"
+            fullWidth
+            startIcon={<CreditCardIcon />}
+            onClick={handleStripePay}
+            disabled={isStripeLoading}
+            sx={{
+              backgroundColor: '#8e24aa',
+              color: 'white',
+              fontWeight: 'bold',
+              '&:hover': {
+                backgroundColor: '#6a1b9a',
+              }
+            }}
+          >
+            Pay
+          </Button>
+        </Box>
+
+      </CardContent>
+      </Card>
     </>
   );
 };

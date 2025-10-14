@@ -66,15 +66,14 @@ const VideoPlayer: FC = () => {
   const { telegramUsername, paypalClientId, stripePublishableKey, cryptoWallets, siteName } = useSiteConfig();
   const [video, setVideo] = useState<Video | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [videoSources, setVideoSources] = useState<Array<{ id: string; source_file_id: string }>>([]);
+  const [sourceUrls, setSourceUrls] = useState<string[]>([]);
+  const [currentSourceIndex, setCurrentSourceIndex] = useState<number>(0);
+  const [allVideoUrls, setAllVideoUrls] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [purchaseError, setPurchaseError] = useState<string | null>(null);
-  const [hasPurchased, setHasPurchased] = useState(false);
-  const [purchaseComplete, setPurchaseComplete] = useState(false);
   const [suggestedVideos, setSuggestedVideos] = useState<Video[]>([]);
-  const [showPurchaseModal, setShowPurchaseModal] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const [pdfGenerated, setPdfGenerated] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showOverlay, setShowOverlay] = useState(true);
   const [showCryptoModal, setShowCryptoModal] = useState(false);
@@ -83,8 +82,7 @@ const VideoPlayer: FC = () => {
   const [isStripeLoading, setIsStripeLoading] = useState(false);
   const [showPrePaymentModal, setShowPrePaymentModal] = useState(false);
   const [paymentType, setPaymentType] = useState<'stripe' | 'paypal' | null>(null);
-  const [redirectCountdown, setRedirectCountdown] = useState(10);
-  const [copiedLinkIndex, setCopiedLinkIndex] = useState<number | null>(null);
+  const [redirectCountdown, setRedirectCountdown] = useState(7);
   const theme = useTheme();
 
   useEffect(() => {
@@ -99,13 +97,10 @@ const VideoPlayer: FC = () => {
         setLoading(true);
         setError(null);
         // Reset purchase state when loading a new video
-        setHasPurchased(false);
-        setPurchaseComplete(false);
-        setShowPurchaseModal(false);
         setPurchaseError(null);
         setPreviewUrl(null);
 
-        // Get video details FIRST (ultra-fast operation)
+        // Get video details
         const videoData = await VideoService.getVideo(id);
         if (!videoData) {
           setError('Video not found');
@@ -113,43 +108,46 @@ const VideoPlayer: FC = () => {
           return;
         }
         
-        // Set video immediately - this shows the video info right away
         setVideo(videoData);
         
-        // Set loading to false immediately so user sees the video info
-        setLoading(false);
-        
-        // Load preview video URL in background (non-blocking)
-        VideoService.getVideoFileUrl(id)
-          .then(url => {
-            console.log('Video URL obtained:', url);
-            setPreviewUrl(url);
-          })
-          .catch(err => {
-            console.error('Error loading preview video:', err);
-            // Don't set error, just log it - the thumbnail will be shown instead
-          });
-        
-        // Increment view count in background (non-blocking)
-        VideoService.incrementViews(id).catch(err => {
-          console.error('Error incrementing views:', err);
-        });
-        
-        // Check if user has purchased this video (only if logged in)
-        if (user) {
-          // Não precisamos mais verificar se o usuário comprou o vídeo
-          // O fluxo de compra será sempre possível
-          setHasPurchased(false);
-          
-          // Show purchase modal if it's the first time after purchase
-          const justPurchased = sessionStorage.getItem(`purchased_${id}`);
-          if (justPurchased) {
-            // Make sure we only show the modal for the current video
-            setShowPurchaseModal(true);
-            // Clear the flag immediately to prevent showing the modal again
-            sessionStorage.removeItem(`purchased_${id}`);
+        // Increment view count
+        await VideoService.incrementViews(id);
+
+        // Get preview or first source URL
+        try {
+          const sources = await VideoService.getVideoSources(id);
+          console.log('[videoplayer] Found sources:', sources.length, sources);
+          setVideoSources(sources.map(s => ({ id: s.id, source_file_id: s.source_file_id })));
+          const resolved: string[] = [];
+          for (const s of sources) {
+            const u = await VideoService.getFileUrlById(s.source_file_id);
+            if (u) resolved.push(u);
           }
+          console.log('[videoplayer] Resolved URLs:', resolved.length, resolved);
+          setSourceUrls(resolved);
+          
+          // Combine main video with sources for navigation
+          const allUrls: string[] = [];
+          
+          // Add main video first if it exists
+          const mainVideoUrl = await VideoService.getVideoFileUrl(id);
+          if (mainVideoUrl) {
+            allUrls.push(mainVideoUrl);
+            setPreviewUrl(mainVideoUrl);
+          }
+          
+          // Add sources
+          allUrls.push(...resolved);
+          setAllVideoUrls(allUrls);
+          setCurrentSourceIndex(0);
+          
+          console.log('[videoplayer] All video URLs (main + sources):', allUrls.length, allUrls);
+        } catch (err) {
+          console.error('Error loading preview video:', err);
+          // Don't set error, just log it - the thumbnail will be shown instead
         }
+        
+        // Note: Purchase flow is now handled by redirecting to /payment-success page
         
         // Load suggested videos in background (non-blocking)
         // This will not block the main video from loading
@@ -167,6 +165,7 @@ const VideoPlayer: FC = () => {
       } catch (err) {
         console.error('Error loading video:', err);
         setError('Failed to load video. Please try again later.');
+      } finally {
         setLoading(false);
       }
     };
@@ -174,48 +173,6 @@ const VideoPlayer: FC = () => {
     loadVideo();
   }, [id, user]);
 
-
-  const handleTelegramRedirect = () => {
-    if (telegramUsername && video) {
-      // Criar mensagem detalhada com informações do vídeo
-      const videoDetails = `
-🎬 *${video.title}*
-
-💰 *Price:* $${video.price.toFixed(2)}
-⏱️ *Duration:* ${video.duration ? formatDuration(video.duration) : 'N/A'}
-👀 *Views:* ${formatViews(video.views)}
-📅 *Added:* ${video.createdAt ? formatDate(new Date(video.createdAt)) : 'N/A'}
-
-📝 *Description:*
-${video.description || 'No description available'}
-      `.trim();
-
-      // Codificar a mensagem para URL
-      const encodedMessage = encodeURIComponent(videoDetails);
-      
-      // Abrir Telegram com a mensagem pré-formatada
-      window.open(`https://t.me/${telegramUsername}?text=${encodedMessage}`, '_blank');
-    }
-  };
-
-  const handleBack = () => {
-    navigate(-1);
-  };
-
-  const handleVideoPlay = () => {
-    setIsPlaying(true);
-    setShowOverlay(false);
-  };
-
-  const handleVideoPause = () => {
-    setIsPlaying(false);
-    // Don't show overlay when paused, as it might block controls
-  };
-  
-  const handleVideoInteraction = () => {
-    // Hide overlay when user interacts with the video
-    setShowOverlay(false);
-  };
 
   // Format duration (e.g., "1:30" to "1 min 30 sec")
   const formatDuration = (duration?: string | number) => {
@@ -281,6 +238,63 @@ ${video.description || 'No description available'}
     }
   };
 
+  // Create Telegram href for the button
+  const telegramHref = (() => {
+    if (!video) {
+      return telegramUsername ? `https://t.me/${telegramUsername.replace('@', '')}` : 'https://t.me/share/url';
+    }
+    
+    // Format date for "Added" field
+    const formatAddedDate = (date: Date) => {
+      const now = new Date();
+      const diffTime = Math.abs(now.getTime() - date.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      if (diffDays === 1) return '1 day ago';
+      if (diffDays < 7) return `${diffDays} days ago`;
+      if (diffDays < 30) return `${Math.ceil(diffDays / 7)} weeks ago`;
+      return `${Math.ceil(diffDays / 30)} months ago`;
+    };
+    
+    const msg = `🎬 **${video.title}**
+
+💰 **Price:** $${video.price.toFixed(2)}
+⏱️ **Duration:** ${formatDuration(video.duration)}
+👀 **Views:** ${formatViews(video.views)}
+📅 **Added:** ${formatAddedDate(new Date(video.createdAt || Date.now()))}
+
+📝 **Description:**
+${video.description || 'No description available'}
+
+Please let me know how to proceed with payment.`;
+    
+    const encoded = encodeURIComponent(msg);
+    if (telegramUsername) {
+      return `https://t.me/${telegramUsername.replace('@', '')}?text=${encoded}`;
+    } else {
+      return `https://t.me/share/url?text=${encoded}`;
+    }
+  })();
+
+  const handleBack = () => {
+    navigate(-1);
+  };
+
+  const handleVideoPlay = () => {
+    setIsPlaying(true);
+    setShowOverlay(false);
+  };
+
+  const handleVideoPause = () => {
+    setIsPlaying(false);
+    // Don't show overlay when paused, as it might block controls
+  };
+  
+  const handleVideoInteraction = () => {
+    // Hide overlay when user interacts with the video
+    setShowOverlay(false);
+  };
+
   // Format date to readable format
   const formatDate = (date: Date) => {
     return new Intl.DateTimeFormat('en-US', {
@@ -290,33 +304,6 @@ ${video.description || 'No description available'}
     }).format(date);
   };
 
-  // Copy product link to clipboard
-  const copyToClipboard = () => {
-    if (video?.product_link) {
-      navigator.clipboard.writeText(video.product_link)
-        .then(() => {
-      setCopied(true);
-          setTimeout(() => setCopied(false), 3000);
-        })
-        .catch(err => console.error('Failed to copy: ', err));
-    }
-  };
-
-  // Copy individual link to clipboard
-  const copyIndividualLink = (link: string, index: number) => {
-    navigator.clipboard.writeText(link.trim())
-      .then(() => {
-        setCopiedLinkIndex(index);
-        setTimeout(() => setCopiedLinkIndex(null), 3000);
-      })
-      .catch(err => console.error('Failed to copy: ', err));
-  };
-
-  // Split product links by space
-  const getProductLinks = () => {
-    if (!video?.product_link) return [];
-    return video.product_link.split(/\s+/).filter(link => link.trim().length > 0);
-  };
 
   // Função para obter um nome de produto genérico aleatório em inglês
   const getRandomProductName = () => {
@@ -335,82 +322,6 @@ ${video.description || 'No description available'}
   };
 
 
-  // Generate PDF with product link
-  const generatePDF = () => {
-    if (!video) return;
-    
-    try {
-      const doc = new jsPDF();
-      
-      // Set font size and styles
-      doc.setFontSize(22);
-      doc.setTextColor(229, 9, 20); // Netflix red
-      doc.text("ADULTFLIX", 105, 20, { align: "center" });
-    
-      doc.setFontSize(16);
-      doc.setTextColor(0, 0, 0);
-      doc.text("Purchase Receipt", 105, 30, { align: "center" });
-    
-      // Add horizontal line
-      doc.setDrawColor(200, 200, 200);
-      doc.line(20, 35, 190, 35);
-      
-      // Video details (usando o nome original do vídeo)
-      doc.setFontSize(14);
-      doc.setTextColor(0, 0, 0);
-      doc.text(`Video: ${video.title}`, 20, 50);
-      doc.text(`Purchase Date: ${formatDate(new Date())}`, 20, 60);
-      doc.text(`Price: $${video.price.toFixed(2)}`, 20, 70);
-    
-      // Product link section
-      doc.setFontSize(14);
-      doc.text("Your Product Link:", 20, 90);
-      
-      // Draw a box around the link
-      doc.setDrawColor(229, 9, 20); // Netflix red
-      doc.setFillColor(245, 245, 245);
-      doc.roundedRect(20, 95, 170, 20, 3, 3, 'FD');
-    
-      // Add the link text
-      doc.setFontSize(12);
-      doc.setTextColor(0, 0, 0);
-      
-      if (video.product_link) {
-        doc.text(video.product_link, 25, 107);
-      } else {
-        doc.text("Contact support via Telegram for access", 25, 107);
-      }
-    
-      // Instructions
-      doc.setFontSize(12);
-      doc.setTextColor(80, 80, 80);
-      doc.text("Instructions:", 20, 130);
-      
-      if (video.product_link) {
-        doc.text("1. Copy the link above and paste it in your browser", 25, 140);
-        doc.text("2. The link will take you to your purchased content", 25, 150);
-        doc.text("3. This link is for your personal use only", 25, 160);
-        doc.text("4. Do not share this link with others", 25, 170);
-      } else {
-        doc.text("1. Contact support via Telegram to get access to your content", 25, 140);
-        doc.text("2. Provide your purchase details when contacting support", 25, 150);
-        doc.text("3. Support will provide you with access instructions", 25, 160);
-      }
-    
-      // Footer
-      doc.setFontSize(10);
-      doc.setTextColor(120, 120, 120);
-      doc.text("Thank you for your purchase!", 105, 200, { align: "center" });
-      doc.text("© ADULTFLIX - All Rights Reserved", 105, 206, { align: "center" });
-    
-      // Save the PDF (usando o nome original do vídeo para o arquivo)
-      doc.save(`ADULTFLIX-Receipt-${video.title.replace(/\s+/g, '-')}.pdf`);
-      setPdfGenerated(true);
-      setTimeout(() => setPdfGenerated(false), 3000);
-    } catch (error) {
-      console.error('Error generating PDF:', error);
-    }
-  };
 
   // Create PayPal order
   const createOrder = (_: any, actions: any) => {
@@ -460,62 +371,23 @@ ${video.description || 'No description available'}
       const userId = user ? user.$id : 'guest-' + Date.now();
       
       try {
-        // Mostrar diretamente o modal de compra bem-sucedida
-        // Não precisamos mais tentar registrar a compra no banco de dados
-        setHasPurchased(true);
-        setPurchaseComplete(true);
-        setShowPurchaseModal(true);
+        // Redirect to payment success page with PayPal data
+        const successUrl = new URL('/payment-success', window.location.origin);
+        successUrl.searchParams.set('video_id', video.$id);
+        successUrl.searchParams.set('session_id', orderData.id);
+        successUrl.searchParams.set('payment_method', 'paypal');
         
-        // Armazenar uma flag que acabamos de comprar este vídeo
-        sessionStorage.setItem(`purchased_${video.$id}`, 'true');
-        
-        // Se não temos um nome de produto, gerar um novo
-        if (!purchasedProductName) {
-          setPurchasedProductName(getRandomProductName());
+        if (orderData.payer?.email_address) {
+          successUrl.searchParams.set('buyer_email', orderData.payer.email_address);
         }
         
-        // Send confirmation email if we have PayPal payer info
-        if (orderData && orderData.payer && orderData.payer.email_address) {
-          const API_BASE_URL = import.meta.env.DEV ? 'http://localhost:3000' : (import.meta.env.VITE_API_URL || '');
-          
-          try {
-            const response = await fetch(`${API_BASE_URL}/api/send-paypal-confirmation`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                buyerEmail: orderData.payer.email_address,
-                buyerName: orderData.payer.name?.given_name || '',
-                transactionId: orderData.id,
-                isCompany: siteName || '',
-              }),
-            });
-            
-            const emailResult = await response.json();
-            console.log('Email sent result:', emailResult);
-          } catch (emailError) {
-            console.error('Failed to send confirmation email:', emailError);
-            // Don't show this error to the user since payment was successful
-          }
+        if (orderData.payer?.name?.given_name) {
+          successUrl.searchParams.set('buyer_name', orderData.payer.name.given_name);
         }
-
-        // Send Telegram notification
-        try {
-          await TelegramService.sendSaleNotification({
-            videoTitle: video.title,
-            videoPrice: video.price,
-            buyerEmail: orderData?.payer?.email_address,
-            buyerName: orderData?.payer?.name?.given_name,
-            transactionId: orderData.id,
-            paymentMethod: 'paypal',
-            timestamp: new Date().toLocaleString('en-US'),
-            videoUrl: `${window.location.origin}/video/${video.$id}`
-          });
-        } catch (telegramError) {
-          console.error('Failed to send Telegram notification:', telegramError);
-          // Don't show this error to the user since payment was successful
-        }
+        
+        // Redirect to success page
+        window.location.href = successUrl.toString();
+        return;
       } catch (error) {
         console.error('Error processing payment:', error);
         setPurchaseError('Payment processing failed. Please try again later.');
@@ -526,9 +398,6 @@ ${video.description || 'No description available'}
     }
   };
 
-  const handleCloseModal = () => {
-      setShowPurchaseModal(false);
-  };
 
   // Handle pre-payment modal
   const startPaymentProcess = (type: 'stripe' | 'paypal') => {
@@ -538,8 +407,8 @@ ${video.description || 'No description available'}
     // Mostrar o modal informativo
     setShowPrePaymentModal(true);
     
-    // Iniciar contador de 5 segundos
-    setRedirectCountdown(5);
+    // Iniciar contador de 7 segundos
+    setRedirectCountdown(7);
     
     // Iniciar contagem regressiva
     const countdownInterval = setInterval(() => {
@@ -583,7 +452,7 @@ ${video.description || 'No description available'}
       setPurchasedProductName(randomProductName);
       
       // Build success and cancel URLs
-      const successUrl = `${window.location.origin}/video/${id}?payment_success=true&session_id={CHECKOUT_SESSION_ID}`;
+      const successUrl = `${window.location.origin}/payment-success?video_id=${id}&session_id={CHECKOUT_SESSION_ID}&payment_method=stripe`;
       const cancelUrl = `${window.location.origin}/video/${id}?payment_canceled=true`;
       
       // Create checkout session
@@ -617,96 +486,7 @@ ${video.description || 'No description available'}
     startPaymentProcess('stripe');
   };
 
-  // Check for Stripe payment success on component mount
-  useEffect(() => {
-    const queryParams = new URLSearchParams(window.location.search);
-    const paymentSuccess = queryParams.get('payment_success');
-    const sessionId = queryParams.get('session_id');
-    
-    console.log('Stripe payment check:', { paymentSuccess, sessionId, video: !!video, videoTitle: video?.title });
-    
-    // Process payment success even if video is not loaded yet
-    if (paymentSuccess === 'true') {
-      console.log('Stripe payment successful detected, processing...');
-      
-      // If video is loaded, process immediately
-      if (video) {
-        console.log('Video loaded, processing payment success immediately');
-        processStripePaymentSuccess(video, sessionId);
-      } else {
-        console.log('Video not loaded yet, storing payment success for later processing');
-        // Store payment success info for when video loads
-        sessionStorage.setItem(`stripe_payment_success_${id}`, JSON.stringify({
-          sessionId,
-          timestamp: Date.now()
-        }));
-      }
-      
-      // Clear query params immediately to prevent re-processing
-      window.history.replaceState({}, document.title, `/video/${id}`);
-    }
-  }, [id, video]);
-
-  // Process Stripe payment success
-  const processStripePaymentSuccess = (videoData: Video, sessionId: string | null) => {
-    console.log('Processing Stripe payment success for video:', videoData.title);
-    
-    // Update state to show purchase was successful
-    setHasPurchased(true);
-    setPurchaseComplete(true);
-    setShowPurchaseModal(true);
-    
-    // Store the purchase in session storage
-    sessionStorage.setItem(`purchased_${videoData.$id}`, 'true');
-    
-    // Set a random product name if not already set
-    if (!purchasedProductName) {
-      setPurchasedProductName(getRandomProductName());
-    }
-    
-    // Send Telegram notification for Stripe payment
-    if (sessionId) {
-      console.log('Sending Stripe notification to Telegram with sessionId:', sessionId);
-      TelegramService.sendSaleNotification({
-        videoTitle: videoData.title,
-        videoPrice: videoData.price,
-        buyerEmail: undefined, // Stripe doesn't provide email in success URL
-        buyerName: undefined, // Stripe doesn't provide name in success URL
-        transactionId: sessionId,
-        paymentMethod: 'stripe',
-        timestamp: new Date().toLocaleString('pt-BR'),
-        videoUrl: `${window.location.origin}/video/${videoData.$id}`
-      }).then(success => {
-        console.log('Stripe notification result:', success);
-      }).catch(error => {
-        console.error('Failed to send Stripe notification to Telegram:', error);
-      });
-    } else {
-      console.warn('No sessionId found for Stripe payment notification');
-    }
-  };
-
-  // Check for stored Stripe payment success when video loads
-  useEffect(() => {
-    if (video && id) {
-      const storedPayment = sessionStorage.getItem(`stripe_payment_success_${id}`);
-      if (storedPayment) {
-        try {
-          const paymentData = JSON.parse(storedPayment);
-          console.log('Found stored Stripe payment success, processing now:', paymentData);
-          
-          // Process the stored payment success
-          processStripePaymentSuccess(video, paymentData.sessionId);
-          
-          // Clear the stored payment data
-          sessionStorage.removeItem(`stripe_payment_success_${id}`);
-        } catch (error) {
-          console.error('Error processing stored Stripe payment:', error);
-          sessionStorage.removeItem(`stripe_payment_success_${id}`);
-        }
-      }
-    }
-  }, [video, id]);
+  // Note: Stripe payment success is now handled by redirecting to /payment-success page
 
   if (loading) {
     return (
@@ -755,7 +535,7 @@ ${video.description || 'No description available'}
           margin: '0 auto',
           position: 'relative'
         }}>
-          {previewUrl ? (
+          {(sourceUrls.length > 0 || previewUrl) ? (
             // Native browser player
             <Box sx={{ 
               width: '100%',
@@ -767,7 +547,7 @@ ${video.description || 'No description available'}
               bgcolor: '#000'
             }}>
               <video 
-                src={previewUrl}
+                src={allVideoUrls.length > 0 ? allVideoUrls[currentSourceIndex] : (previewUrl || undefined)}
                 controls 
                 autoPlay={false}
               poster={video?.thumbnailUrl}
@@ -775,11 +555,11 @@ ${video.description || 'No description available'}
               onPause={handleVideoPause}
                 onClick={handleVideoInteraction}
                 onMouseOver={handleVideoInteraction}
-                onLoadStart={() => console.log('Video load started:', previewUrl)}
-                onLoadedData={() => console.log('Video data loaded:', previewUrl)}
+                onLoadStart={() => console.log('Video load started:', allVideoUrls[currentSourceIndex])}
+                onLoadedData={() => console.log('Video data loaded:', allVideoUrls[currentSourceIndex])}
                 onError={(e) => {
                   console.error('Video load error:', e);
-                  console.error('Video URL:', previewUrl);
+                  console.error('Video URL:', allVideoUrls[currentSourceIndex]);
                   console.error('Thumbnail URL:', video?.thumbnailUrl);
                 }}
                 style={{
@@ -792,9 +572,10 @@ ${video.description || 'No description available'}
                   zIndex: 1000 /* Ensure video controls are above overlay */
                 }}
               >
-                <source src={previewUrl} type="video/mp4" />
-                Your browser does not support the video element.
+                <source src={allVideoUrls.length > 0 ? allVideoUrls[currentSourceIndex] : (previewUrl || undefined)} type="video/mp4" />
+                Seu navegador não suporta o elemento de vídeo.
               </video>
+
             </Box>
           ) : (
             // Show only the thumbnail if no video URL
@@ -928,11 +709,6 @@ ${video.description || 'No description available'}
         px: { xs: 2, md: 4 } 
       }}>
         <Box sx={{ mb: 6 }}>
-          {purchaseComplete && !showPurchaseModal && (
-          <Alert severity="success" sx={{ mb: 3 }}>
-              Purchase successful! Click here to <Button color="inherit" onClick={() => setShowPurchaseModal(true)}>view your product link</Button>.
-          </Alert>
-        )}
         
         {purchaseError && (
           <Alert severity="error" sx={{ mb: 3 }}>
@@ -948,6 +724,63 @@ ${video.description || 'No description available'}
         >
           Back to Videos
         </Button>
+        
+        {/* Video navigation controls - OUTSIDE the player */}
+        {allVideoUrls.length > 1 && (
+          <Box sx={{
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            gap: 2,
+            mb: 3,
+            p: 2,
+            backgroundColor: 'rgba(0,0,0,0.05)',
+            borderRadius: 2,
+          }}>
+            <Button
+              variant="outlined"
+              color="primary"
+              size="large"
+              onClick={() => setCurrentSourceIndex((idx) => (idx - 1 + allVideoUrls.length) % allVideoUrls.length)}
+              startIcon={<ArrowBackIcon />}
+              sx={{ 
+                minWidth: 120,
+                height: 50,
+                fontWeight: 'bold'
+              }}
+            >
+              Previous Preview
+            </Button>
+            
+            <Box sx={{
+              backgroundColor: 'primary.main',
+              color: 'white',
+              padding: '8px 16px',
+              borderRadius: '20px',
+              fontSize: '16px',
+              fontWeight: 'bold',
+              minWidth: 80,
+              textAlign: 'center'
+            }}>
+              {currentSourceIndex + 1} / {allVideoUrls.length}
+            </Box>
+            
+            <Button
+              variant="outlined"
+              color="primary"
+              size="large"
+              onClick={() => setCurrentSourceIndex((idx) => (idx + 1) % allVideoUrls.length)}
+              endIcon={<ArrowBackIcon sx={{ transform: 'rotate(180deg)' }} />}
+              sx={{ 
+                minWidth: 120,
+                height: 50,
+                fontWeight: 'bold'
+              }}
+            >
+              Next Preview
+            </Button>
+          </Box>
+        )}
         
         {/* Video description */}
         <Box sx={{ mb: 4 }}>
@@ -1045,7 +878,7 @@ ${video.description || 'No description available'}
                   )}
                   
                   {/* Stripe Button */}
-                  {stripePublishableKey && !hasPurchased && (
+                  {stripePublishableKey && (
                     <Box sx={{ width: '100%', mb: { xs: 2, md: 0 } }}>
                       <Button
                         variant="contained"
@@ -1058,35 +891,46 @@ ${video.description || 'No description available'}
                           color: 'white',
                           fontWeight: 'bold',
                           fontSize: 16,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: 1,
                           '&:hover': {
                             backgroundColor: '#4b45c6',
                           }
                         }}
                       >
-                        {isStripeLoading ? 'Processing...' : 'Pay Now'}
+                        {isStripeLoading ? (
+                          'Processing...'
+                        ) : (
+                          <>
+                            {/* Apple Pay Icon */}
+                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 20, height: 20, bgcolor: 'white', borderRadius: 1 }}>
+                              <Typography variant="caption" sx={{ fontSize: '8px', fontWeight: 'bold', color: 'black' }}>🍎</Typography>
+                            </Box>
+                            
+                            {/* Amazon Pay Icon */}
+                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 20, height: 20, bgcolor: '#FF9900', borderRadius: 1 }}>
+                              <Typography variant="caption" sx={{ fontSize: '6px', fontWeight: 'bold', color: 'white' }}>A</Typography>
+                            </Box>
+                            
+                            {/* Visa Icon */}
+                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 20, height: 20, bgcolor: '#1A1F71', borderRadius: 1 }}>
+                              <Typography variant="caption" sx={{ fontSize: '7px', fontWeight: 'bold', color: 'white' }}>VISA</Typography>
+                            </Box>
+                            
+                            {/* Mastercard Icon */}
+                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 20, height: 20, bgcolor: 'white', borderRadius: 1, position: 'relative' }}>
+                              <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: '#EB001B', position: 'absolute', left: 6 }} />
+                              <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: '#F79E1B', position: 'absolute', right: 6 }} />
+                            </Box>
+                            
+                            <Typography variant="body2" sx={{ ml: 1, fontSize: '14px', fontWeight: 'bold' }}>
+                              Pay Securely
+                            </Typography>
+                          </>
+                        )}
                       </Button>
-                      
-                      {/* Information text field */}
-                      <TextField
-                        fullWidth
-                        multiline
-                        rows={3}
-                        value="IMPORTANT: You MUST provide a any valid email address during checkout. Without email, payment will be declined. You will automatically receive the content link immediately after successful payment."
-                        InputProps={{
-                          readOnly: true,
-                          sx: { 
-                            color: theme.palette.mode === 'dark' ? 'white' : theme.palette.text.primary,
-                            bgcolor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
-                            fontSize: '0.875rem',
-                            '& .MuiInputBase-input': {
-                              textAlign: 'center',
-                              fontWeight: 'bold'
-                            }
-                          }
-                        }}
-                        variant="outlined"
-                        sx={{ mt: 1 }}
-                      />
                     </Box>
                   )}
                   
@@ -1116,21 +960,6 @@ ${video.description || 'No description available'}
                     </Box>
                   )}
                   
-                  {/* Product Link Button - Show if purchased */}
-                  {hasPurchased && (
-                    <Box sx={{ width: '100%' }}>
-                      <Button
-                        variant="contained"
-                        color="success"
-                        fullWidth
-                        onClick={() => setShowPurchaseModal(true)}
-                        startIcon={<CheckCircleIcon />}
-                        sx={{ py: 1.5, fontWeight: 'bold', fontSize: 16 }}
-                      >
-                        View Product Link
-                      </Button>
-                    </Box>
-                  )}
                 </Grid>
                 
                 {/* Right column for telegram contact */}
@@ -1140,7 +969,9 @@ ${video.description || 'No description available'}
                       variant="outlined"
                       fullWidth
                       startIcon={<TelegramIcon />}
-                      onClick={handleTelegramRedirect}
+                      href={telegramHref}
+                      target="_blank"
+                      rel="noopener noreferrer"
                       sx={{ 
                         py: 1.5,
                         height: '100%',
@@ -1182,171 +1013,6 @@ ${video.description || 'No description available'}
         </Box>
       </Box>
       
-      {/* Purchase Success Modal */}
-      <Modal
-        open={showPurchaseModal}
-        onClose={handleCloseModal}
-        closeAfterTransition
-        BackdropComponent={Backdrop}
-        BackdropProps={{
-          timeout: 500,
-        }}
-        aria-labelledby="purchase-success-modal"
-        aria-describedby="modal-with-product-link"
-      >
-        <Fade in={showPurchaseModal}>
-          <Box sx={{
-            position: 'absolute',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            width: { xs: '90%', sm: '500px' },
-            bgcolor: theme.palette.mode === 'dark' ? '#1e1e1e' : theme.palette.background.paper,
-            border: '2px solid #E50914',
-            borderRadius: 2,
-            boxShadow: 24,
-            p: 4,
-            color: theme.palette.mode === 'dark' ? 'white' : theme.palette.text.primary,
-          }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-              <Typography variant="h5" component="h2" sx={{ fontWeight: 'bold' }}>
-                Purchase Successful!
-              </Typography>
-              <IconButton 
-                onClick={handleCloseModal} 
-                sx={{ color: theme.palette.mode === 'dark' ? 'white' : theme.palette.text.primary }}
-                aria-label="close"
-              >
-                <CloseIcon />
-              </IconButton>
-            </Box>
-            
-            <Typography variant="body1" sx={{ mb: 2 }}>
-              Thank you for purchasing <strong>{purchasedProductName || getRandomProductName()}</strong>!
-            </Typography>
-            
-            <Typography variant="body1" sx={{ mb: 1 }}>
-              You now have access to: <strong>{video?.title}</strong>
-            </Typography>
-            
-            <Typography variant="body2" sx={{ mb: 3, color: theme.palette.mode === 'dark' ? '#aaa' : '#777' }}>
-              Note: For your privacy, a generic product name was used during checkout.
-            </Typography>
-            
-            <Typography variant="body1" sx={{ mb: 3 }}>
-              {getProductLinks().length > 1 ? 'Here are your product links:' : 'Here is your product link:'}
-            </Typography>
-            
-            {video?.product_link ? (
-              <Box sx={{ mb: 4 }}>
-                {/* Individual Links */}
-                {getProductLinks().map((link, index) => (
-                  <Box key={index} sx={{ mb: 2 }}>
-                    <Typography variant="body2" sx={{ mb: 1, fontWeight: 'bold' }}>
-                      Link {index + 1}:
-                    </Typography>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <TextField
-                        fullWidth
-                        variant="outlined"
-                        value={link.trim()}
-                        InputProps={{
-                          readOnly: true,
-                          sx: { 
-                            color: theme.palette.mode === 'dark' ? 'white' : theme.palette.text.primary,
-                            bgcolor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)'
-                          }
-                        }}
-                      />
-                      <Button
-                        variant="contained"
-                        color={copiedLinkIndex === index ? "success" : "primary"}
-                        onClick={() => copyIndividualLink(link, index)}
-                        startIcon={copiedLinkIndex === index ? <CheckCircleIcon /> : <ContentCopyIcon />}
-                        sx={{ whiteSpace: 'nowrap' }}
-                      >
-                        {copiedLinkIndex === index ? 'Copied!' : 'Copy'}
-                      </Button>
-                    </Box>
-                  </Box>
-                ))}
-
-                {/* Button to copy all links */}
-                {getProductLinks().length > 1 && (
-                  <Box sx={{ mb: 2 }}>
-                    <Button
-                      variant="outlined"
-                      fullWidth
-                      onClick={copyToClipboard}
-                      startIcon={copied ? <CheckCircleIcon /> : <ContentCopyIcon />}
-                      sx={{ 
-                        borderColor: '#E50914',
-                        color: '#E50914',
-                        '&:hover': {
-                          borderColor: '#E50914',
-                          color: '#fff',
-                          background: '#E50914',
-                        }
-                      }}
-                    >
-                      {copied ? 'All Links Copied!' : 'Copy All Links'}
-                    </Button>
-                  </Box>
-                )}
-              </Box>
-            ) : (
-              <Alert severity="info" sx={{ mb: 4 }}>
-                Your purchase was successful! The admin will need to update the product link. 
-                Please contact support through Telegram for immediate access.
-              </Alert>
-            )}
-            
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              {video?.product_link && (
-                <Button
-                  variant="contained"
-                  color={pdfGenerated ? "success" : "secondary"}
-                  fullWidth
-                  startIcon={pdfGenerated ? <CheckCircleIcon /> : <PictureAsPdfIcon />}
-                  onClick={generatePDF}
-                >
-                  {pdfGenerated ? 'PDF Downloaded!' : 'Download Receipt PDF'}
-                </Button>
-              )}
-              
-              {telegramUsername && (
-                <Button
-                  variant="outlined"
-                  fullWidth
-                  startIcon={<TelegramIcon />}
-                  onClick={handleTelegramRedirect}
-                  sx={{ 
-                    borderColor: '#229ED9',
-                    color: '#229ED9',
-                    '&:hover': {
-                      borderColor: '#229ED9',
-                      color: '#fff',
-                      background: '#229ED9',
-                    }
-                  }}
-                >
-                  Contact on Telegram
-                </Button>
-              )}
-              
-            <Typography variant="body2" sx={{ 
-              color: theme.palette.mode === 'dark' ? '#aaa' : theme.palette.text.secondary, 
-              textAlign: 'center', 
-              mt: 2 
-            }}>
-              {video?.product_link 
-                ? 'Please save your product link and download the receipt PDF before closing this window. If any link does not work, please contact us via Telegram for immediate assistance.'
-                : 'Your purchase has been recorded. Please contact support for access to your content.'}
-            </Typography>
-            </Box>
-          </Box>
-        </Fade>
-      </Modal>
       
       {/* Crypto Wallets Modal */}
       <Modal
@@ -1364,7 +1030,7 @@ ${video.description || 'No description available'}
             top: '50%',
             left: '50%',
             transform: 'translate(-50%, -50%)',
-            width: { xs: '95%', sm: 420, md: 500 },
+            width: { xs: '95%', sm: 420 },
             bgcolor: theme.palette.mode === 'dark' ? '#181818' : '#fff',
             borderRadius: 3,
             boxShadow: 24,
@@ -1386,21 +1052,46 @@ ${video.description || 'No description available'}
               <b>After payment, send your proof of payment via Telegram for manual confirmation.</b>
             </Typography>
             {cryptoWallets.map((wallet, idx) => {
-              // Parse wallet: "CODE - Name\naddress"
-              const lines = wallet.split('\n');
-              const header = lines[0] || '';
-              const address = lines[1] || '';
-              const [code, name] = header.split(' - ');
+              // Parse wallet: "CODE:address" format (from Admin.tsx)
+              let code = '';
+              let name = '';
+              let address = '';
               
-              // Ensure we have a valid address to copy
-              const addressToCopy = address.trim() || wallet.trim();
+              if (wallet.includes(':')) {
+                // Format: "CODE:address"
+                const parts = wallet.split(':');
+                code = parts[0]?.trim() || '';
+                address = parts[1]?.trim() || '';
+                name = code; // Use code as name
+              } else if (wallet.includes('\n')) {
+                // Format: "CODE - Name\naddress" (legacy)
+                const lines = wallet.split('\n');
+                const header = lines[0];
+                address = lines[1]?.trim() || '';
+                
+                if (header.includes(' - ')) {
+                  const parts = header.split(' - ');
+                  code = parts[0]?.trim() || '';
+                  name = parts[1]?.trim() || '';
+                } else {
+                  name = header.trim();
+                  code = header.trim().split(' ')[0];
+                }
+              } else {
+                // Fallback: treat as address only
+                address = wallet.trim();
+                code = wallet.trim().split(' ')[0];
+                name = 'Crypto Wallet';
+              }
+              
+              // Only render if we have a valid address
+              if (!address) return null;
               
               return (
                 <Box key={idx} sx={{
                   display: 'flex',
-                  flexDirection: { xs: 'column', sm: 'row' },
-                  alignItems: { xs: 'stretch', sm: 'center' },
-                  gap: { xs: 2, sm: 2 },
+                  alignItems: 'center',
+                  gap: 2,
                   mb: 3,
                   p: 2,
                   border: '1px solid',
@@ -1408,27 +1099,10 @@ ${video.description || 'No description available'}
                   borderRadius: 2,
                   background: theme.palette.mode === 'dark' ? '#232323' : '#fafafa',
                 }}>
-                  <Box sx={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: 2, 
-                    flex: 1,
-                    minWidth: 0
-                  }}>
-                    <Box sx={{ minWidth: 40, flexShrink: 0 }}>{cryptoIcons[code] || <MonetizationOnIcon fontSize="large" />}</Box>
-                    <Box sx={{ flex: 1, minWidth: 0 }}>
-                      <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>{name || code}</Typography>
-                      <Typography 
-                        variant="body2" 
-                        sx={{ 
-                          wordBreak: 'break-all', 
-                          color: theme.palette.mode === 'dark' ? '#fff' : '#222',
-                          fontSize: { xs: '0.75rem', sm: '0.875rem' }
-                        }}
-                      >
-                        {addressToCopy}
-                      </Typography>
-                    </Box>
+                  <Box sx={{ minWidth: 40 }}>{cryptoIcons[code] || <MonetizationOnIcon fontSize="large" />}</Box>
+                  <Box sx={{ flex: 1 }}>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>{name || code || 'Crypto Wallet'}</Typography>
+                    <Typography variant="body2" sx={{ wordBreak: 'break-all', color: theme.palette.mode === 'dark' ? '#fff' : '#222' }}>{address}</Typography>
                   </Box>
                   <Button
                     variant={copiedWalletIndex === idx ? 'contained' : 'outlined'}
@@ -1436,26 +1110,25 @@ ${video.description || 'No description available'}
                     size="small"
                     startIcon={copiedWalletIndex === idx ? <CheckCircleIcon /> : <ContentCopyIcon />}
                     onClick={() => {
-                      navigator.clipboard.writeText(addressToCopy);
+                      navigator.clipboard.writeText(address);
                       setCopiedWalletIndex(idx);
                       setTimeout(() => setCopiedWalletIndex(null), 2000);
                     }}
-                    sx={{ 
-                      minWidth: { xs: '100%', sm: 90 },
-                      mt: { xs: 1, sm: 0 }
-                    }}
+                    sx={{ minWidth: 90 }}
                   >
                     {copiedWalletIndex === idx ? 'Copied!' : 'Copy'}
                   </Button>
                 </Box>
               );
-            })}
+            }).filter(Boolean)}
             <Box sx={{ mt: 2, textAlign: 'center' }}>
               <Button
                 variant="outlined"
                 color="primary"
                 startIcon={<TelegramIcon />}
-                onClick={handleTelegramRedirect}
+                href={telegramHref}
+                target="_blank"
+                rel="noopener noreferrer"
               >
                 Contact on Telegram
               </Button>
@@ -1464,7 +1137,7 @@ ${video.description || 'No description available'}
         </Fade>
       </Modal>
       
-      {/* Payment Processing Modal */}
+      {/* Modal de pré-pagamento */}
       <Modal
         open={showPrePaymentModal}
         onClose={() => setShowPrePaymentModal(false)}
@@ -1480,7 +1153,7 @@ ${video.description || 'No description available'}
             top: '50%',
             left: '50%',
             transform: 'translate(-50%, -50%)',
-            width: { xs: '95%', sm: 450 },
+            width: { xs: '95%', sm: 400 },
             maxWidth: 500,
             bgcolor: theme.palette.mode === 'dark' ? '#1e1e1e' : theme.palette.background.paper,
             border: '2px solid #E50914',
@@ -1505,40 +1178,14 @@ ${video.description || 'No description available'}
             </Typography>
             
             <Alert severity="info" sx={{ mb: 3 }}>
-              <Typography variant="body2" sx={{ fontWeight: 'bold', mb: 1 }}>
-                What to expect:
-              </Typography>
-              <Typography variant="body2" sx={{ mb: 1 }}>
-                • Generic product name for privacy
-              </Typography>
-              <Typography variant="body2" sx={{ mb: 1 }}>
-                • Redirect to secure payment page
-              </Typography>
-              <Typography variant="body2">
-                • Return here with content link after payment
-              </Typography>
-            </Alert>
-            
-            <Alert severity="warning" sx={{ mb: 3 }}>
-              <Typography variant="body2" sx={{ fontWeight: 'bold', mb: 1 }}>
-                Important:
-              </Typography>
-              <Typography variant="body2" sx={{ mb: 1, color: '#d32f2f', fontWeight: 'bold' }}>
-                • EMAIL REQUIRED
-              </Typography>
-              <Typography variant="body2" sx={{ mb: 1 }}>
-                • One attempt only
-              </Typography>
-              <Typography variant="body2">
-                • Contact Telegram if issues
-              </Typography>
+              For your privacy, a generic product name will appear during checkout.
             </Alert>
             
             <Typography variant="body2" sx={{ mb: 2, color: theme.palette.mode === 'dark' ? '#aaa' : '#777', display: 'flex', justifyContent: 'space-between' }}>
               <span>Redirecting in:</span> <span>{redirectCountdown} seconds</span>
             </Typography>
             
-            <LinearProgress variant="determinate" value={(5 - redirectCountdown) * 20} sx={{ mb: 2 }} />
+            <LinearProgress variant="determinate" value={(7 - redirectCountdown) * (100/7)} sx={{ mb: 2 }} />
             
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
               <Button 

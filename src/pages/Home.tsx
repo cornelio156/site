@@ -17,21 +17,17 @@ import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import Skeleton from '@mui/material/Skeleton';
 import Tooltip from '@mui/material/Tooltip';
-import ToggleButton from '@mui/material/ToggleButton';
-import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
-import Paper from '@mui/material/Paper';
+ 
 import { Chip } from '@mui/material';
 import { useAuth } from '../services/Auth';
 import VideoCard from '../components/VideoCard';
 import { VideoService, Video, SortOption } from '../services/VideoService';
 import { useSiteConfig } from '../context/SiteConfigContext';
-import { StripeService } from '../services/StripeService';
-import TelegramIcon from '@mui/icons-material/Telegram';
-// import FeaturedBanner from '../components/FeaturedBanner'; // Temporarily disabled
+import FeaturedBanner from '../components/FeaturedBanner';
+import PromoOfferBanner from '../components/PromoOfferBanner';
 import DatabaseSetupModal from '../components/DatabaseSetupModal';
 import CredentialsStatus from '../components/CredentialsStatus';
 import ContactSection from '../components/ContactSection';
-import OnlineUsersCounter from '../components/OnlineUsersCounter';
 
 // Skeleton card component for loading state
 const VideoCardSkeleton: FC = () => {
@@ -125,22 +121,61 @@ const VideoCardLoading: FC<{ index: number }> = ({ index }) => {
 };
 
 const Home: FC = () => {
+  const [videos, setVideos] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [setupModalOpen, setSetupModalOpen] = useState(false);
   const [showSetupButton, setShowSetupButton] = useState(false);
-  // const [quickSearchQuery, setQuickSearchQuery] = useState(''); // Removed - no longer needed
+  
   const [loadedVideos, setLoadedVideos] = useState<Video[]>([]);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [selectedFilter, setSelectedFilter] = useState<SortOption>(SortOption.VIEWS_DESC);
+  const [sectionOnlineNow, setSectionOnlineNow] = useState<number>(() => Math.floor(Math.random() * 101));
+  const [sectionHappyCustomers] = useState<number>(() => Math.floor(Math.random() * (1300 - 700 + 1)) + 700);
+  const [sectionRating] = useState<number>(() => parseFloat((Math.random() * 0.6 + 4.2).toFixed(1)));
   
   const { user } = useAuth();
-  const { videoListTitle, telegramUsername, stripePublishableKey } = useSiteConfig();
+  const { videoListTitle, telegramUsername } = useSiteConfig();
   const navigate = useNavigate();
   const videosPerPage = 24; // Aumentar de 12 para 24 vídeos por página
-  const [stripeLoading, setStripeLoading] = useState(false);
+
+  // Check for Stripe payment success on component mount
+  useEffect(() => {
+    const queryParams = new URLSearchParams(window.location.search);
+    const paymentSuccess = queryParams.get('payment_success');
+    const sessionId = queryParams.get('session_id');
+    
+    if (paymentSuccess === 'true') {
+      // Show success message
+      console.log('Payment successful! Session ID:', sessionId);
+      
+      // Redirect to Telegram with success message
+      if (telegramUsername) {
+        const successMessage = `🎉 **Payment Successful!** 🎉
+
+✅ **Transaction ID:** ${sessionId || 'N/A'}
+💰 **Amount:** $85.00
+📦 **Package:** ALL CONTENT INCLUDED
+⏰ **Time:** ${new Date().toLocaleString()}
+
+Thank you for your purchase! You now have access to all content on the site.
+
+Please let me know if you need any assistance accessing your content.`;
+        
+        const encoded = encodeURIComponent(successMessage);
+        const telegramUrl = `https://t.me/${telegramUsername.replace('@', '')}?text=${encoded}`;
+        
+        // Open Telegram after a short delay
+        setTimeout(() => {
+          window.open(telegramUrl, '_blank');
+        }, 2000);
+      }
+      
+      // Clear query params
+      window.history.replaceState({}, document.title, '/');
+    }
+  }, [telegramUsername]);
 
   useEffect(() => {
     const fetchVideos = async () => {
@@ -148,9 +183,10 @@ const Home: FC = () => {
         setLoading(true);
         setError(null);
         setLoadedVideos([]); // Reset loaded videos
+        setVideos([]); // Reset videos array
         
-        // Get video IDs first (ultra-fast operation - no metadata loading)  
-        const allVideoIds = await VideoService.getVideoIds(selectedFilter);
+        // Get video IDs first (ultra-fast operation - no metadata loading)
+        const allVideoIds = await VideoService.getVideoIds(SortOption.NEWEST);
         const totalPages = Math.ceil(allVideoIds.length / videosPerPage);
         setTotalPages(totalPages);
         
@@ -175,58 +211,41 @@ const Home: FC = () => {
     
     // Sempre mostrar o botão de configuração (não dependemos mais do Appwrite)
     setShowSetupButton(false);
-  }, [user, page, selectedFilter]);
+  }, [user, page]);
+
+  // Animate small online counter (0-100) below the title
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setSectionOnlineNow(prev => {
+        const delta = Math.floor(Math.random() * 12) - 5; // -5..+6
+        const next = prev + delta;
+        return Math.min(100, Math.max(0, next));
+      });
+    }, 4000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Function to load videos one by one (immediate first video)
   const loadVideosOneByOne = async (videoIds: string[]) => {
     setIsLoadingMore(true);
     
-    // Load first 3 videos immediately without delay
-    const immediateVideos = videoIds.slice(0, 3);
-    const remainingVideos = videoIds.slice(3);
-    
-    // Load first 3 videos in parallel for instant display
-    const immediatePromises = immediateVideos.map(async (videoId) => {
-      try {
-        const video = await VideoService.getVideo(videoId);
-        if (video) {
-          setLoadedVideos(prev => {
-            // Check if video already exists to prevent duplicates
-            if (prev.some(v => v.$id === video.$id)) {
-              return prev;
-            }
-            return [...prev, video];
-          });
-        }
-      } catch (error) {
-        console.error(`Error loading video ${videoId}:`, error);
-      }
-    });
-    
-    // Wait for first 3 videos to load
-    await Promise.all(immediatePromises);
-    
-    // Load remaining videos one by one with delay
-    for (let i = 0; i < remainingVideos.length; i++) {
-      const videoId = remainingVideos[i];
+    for (let i = 0; i < videoIds.length; i++) {
+      const videoId = videoIds[i];
       
       try {
         // Load individual video
         const video = await VideoService.getVideo(videoId);
         
         if (video) {
-          // Add video immediately to both arrays, checking for duplicates
-          setLoadedVideos(prev => {
-            // Check if video already exists to prevent duplicates
-            if (prev.some(v => v.$id === video.$id)) {
-              return prev;
-            }
-            return [...prev, video];
-          });
+          // Add video immediately to both arrays
+          setLoadedVideos(prev => [...prev, video]);
+          setVideos(prev => [...prev, video]);
         }
         
-        // Add a small delay between videos
+        // Add a small delay between videos (except for the first one)
+        if (i > 0) {
           await new Promise(resolve => setTimeout(resolve, 150));
+        }
       } catch (error) {
         console.error(`Error loading video ${videoId}:`, error);
         // Continue with next video even if current one fails
@@ -254,13 +273,6 @@ const Home: FC = () => {
         });
       }
     }, 100);
-  };
-
-  const handleFilterChange = (event: React.MouseEvent<HTMLElement>, newFilter: SortOption | null) => {
-    if (newFilter !== null) {
-      setSelectedFilter(newFilter);
-      setPage(1); // Reset to first page when changing filter
-    }
   };
 
   // Render skeleton loaders during loading state
@@ -291,66 +303,15 @@ const Home: FC = () => {
     ));
   };
 
-  // const handleBannerError = (errorMsg: string) => {
-  //   setError(errorMsg);
-  // }; // Temporarily disabled with FeaturedBanner
-
-  // const handleQuickSearch = (event: React.FormEvent) => {
-  //   event.preventDefault();
-  //   if (quickSearchQuery.trim()) {
-  //     navigate(`/videos?search=${encodeURIComponent(quickSearchQuery.trim())}`);
-  //   }
-  // }; // Removed - search is now handled by header search bar only
-
-  // const handleQuickSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-  //   setQuickSearchQuery(event.target.value);
-  // }; // Removed - search is now handled by header search bar only
-
-  const handleTelegramClick = () => {
-    if (telegramUsername) {
-      // Create special offer message for Telegram
-      const specialOfferMessage = `
-Hey! Saw your $85 deal for everything 🔥
-
-I want in! How do I pay?
-
-Thanks!
-      `.trim();
-
-      // Encode message for URL
-      const encodedMessage = encodeURIComponent(specialOfferMessage);
-
-      // Open Telegram with pre-formatted message
-      window.open(`https://t.me/${telegramUsername}?text=${encodedMessage}`, '_blank');
-    }
+  const handleBannerError = (errorMsg: string) => {
+    setError(errorMsg);
   };
 
-  const handleSpecialOfferStripePay = async () => {
-    if (!stripePublishableKey) return;
-    try {
-      setStripeLoading(true);
-      await StripeService.initStripe(stripePublishableKey);
-      const successUrl = `${window.location.origin}/#/videos?offer_payment_success=true&session_id={CHECKOUT_SESSION_ID}`;
-      const cancelUrl = `${window.location.origin}/#/videos?offer_payment_canceled=true`;
-      // Fixed price $85 in USD and generic item name
-      const sessionId = await StripeService.createCheckoutSession(
-        85,
-        'usd',
-        'All Content Offer',
-        successUrl,
-        cancelUrl
-      );
-      await StripeService.redirectToCheckout(sessionId);
-    } catch (err) {
-      console.error('Stripe checkout failed', err);
-    } finally {
-      setStripeLoading(false);
-    }
-  };
+  
 
   return (
     <Box sx={{ width: '100%' }}>
-      {/* Add CSS animations */}
+      {/* Add CSS animation for pulse effect */}
       <style>
         {`
           @keyframes pulse {
@@ -358,181 +319,16 @@ Thanks!
             50% { opacity: 0.7; }
             100% { opacity: 1; }
           }
-          @keyframes shimmer {
-            0% { transform: translateX(-100%); }
-            100% { transform: translateX(100%); }
-          }
         `}
       </style>
       
-      {/* Banner de destaque - Temporarily disabled */}
-      {/* <FeaturedBanner onError={handleBannerError} /> */}
-      
-      {/* Contador de usuários online */}
-      <OnlineUsersCounter 
-        variant="detailed" 
-        position="fixed" 
-        size="medium" 
-      />
-      
-      <Container maxWidth="lg" sx={{ py: { xs: 3, md: 6 } }}>
+      {/* Promoção especial */}
+      <PromoOfferBanner telegramUsername={telegramUsername} />
 
-        {/* Special Offer Section */}
-        <Box sx={{ 
-          mb: 6,
-          py: 5,
-          px: 4,
-          background: 'linear-gradient(135deg, #FF0F50 0%, #D10D42 50%, #8B0000 100%)',
-          borderRadius: 3,
-          color: 'white',
-          textAlign: 'center',
-          position: 'relative',
-          overflow: 'hidden',
-          boxShadow: '0 20px 40px rgba(255, 15, 80, 0.3)',
-          border: '2px solid rgba(255, 255, 255, 0.1)',
-          '&::before': {
-            content: '""',
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'linear-gradient(45deg, transparent 30%, rgba(255,255,255,0.15) 50%, transparent 70%)',
-            animation: 'shimmer 3s infinite'
-          },
-          '&::after': {
-            content: '""',
-            position: 'absolute',
-            top: -50,
-            right: -50,
-            width: 100,
-            height: 100,
-            borderRadius: '50%',
-            background: 'rgba(255, 255, 255, 0.1)',
-            animation: 'pulse 4s ease-in-out infinite'
-          }
-        }}>
-          <Typography variant="h3" sx={{ 
-            fontWeight: 'bold', 
-            mb: 2, 
-            position: 'relative', 
-            zIndex: 1,
-            textShadow: '0 4px 8px rgba(0,0,0,0.3)',
-            fontSize: { xs: '1.8rem', md: '2.5rem' }
-          }}>
-            🎉 SPECIAL OFFER 🎉
-          </Typography>
-          <Typography variant="h4" sx={{ 
-            fontWeight: 'bold', 
-            mb: 2, 
-            position: 'relative', 
-            zIndex: 1,
-            textShadow: '0 3px 6px rgba(0,0,0,0.3)',
-            fontSize: { xs: '1.5rem', md: '2rem' }
-          }}>
-            ALL CONTENT FOR ONLY $85
-          </Typography>
-          <Typography variant="h6" sx={{ 
-            mb: 2, 
-            position: 'relative', 
-            zIndex: 1, 
-            opacity: 0.95,
-            fontSize: { xs: '1rem', md: '1.2rem' },
-            fontWeight: 500
-          }}>
-            Get access to our entire premium collection at an unbeatable price!
-          </Typography>
-          <Typography variant="h5" sx={{ 
-            mb: 3, 
-            position: 'relative', 
-            zIndex: 1, 
-            fontWeight: 'bold', 
-            color: '#FFEB3B',
-            textShadow: '0 2px 4px rgba(0,0,0,0.5)',
-            fontSize: { xs: '1.1rem', md: '1.4rem' },
-            animation: 'pulse 2s ease-in-out infinite'
-          }}>
-            📦 EVERYTHING YOU SEE ON THIS SITE INCLUDED! 📦
-          </Typography>
-          
-          {/* Telegram + Stripe Offer Buttons */}
-          <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', alignItems: 'center', position: 'relative', zIndex: 1, flexWrap: 'wrap' }}>
-            {telegramUsername && (
-              <Button
-                variant="contained"
-                startIcon={<TelegramIcon />}
-                onClick={handleTelegramClick}
-                sx={{ 
-                  backgroundColor: '#0088cc',
-                  color: 'white',
-                  fontWeight: 'bold',
-                  px: 5,
-                  py: 2.5,
-                  borderRadius: '30px',
-                  textTransform: 'none',
-                  fontSize: { xs: '1rem', md: '1.2rem' },
-                  '&:hover': {
-                    backgroundColor: '#006699',
-                    transform: 'scale(1.08) translateY(-2px)',
-                    boxShadow: '0 12px 30px rgba(0, 136, 204, 0.6)',
-                  },
-                  transition: 'all 0.3s ease',
-                  boxShadow: '0 8px 25px rgba(0, 136, 204, 0.5)',
-                  border: '2px solid rgba(255, 255, 255, 0.2)',
-                  backdropFilter: 'blur(10px)',
-                }}
-              >
-                🚀 Come to Negociate 
-              </Button>
-            )}
-            {stripePublishableKey && (
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
-                <Button
-                  variant="contained"
-                  disabled={stripeLoading}
-                  onClick={async () => {
-                    try {
-                      setStripeLoading(true);
-                      await StripeService.initStripe(stripePublishableKey);
-                      const encodedMsg = encodeURIComponent('Payment completed. Please confirm my access.');
-                      const successUrl = telegramUsername
-                        ? `https://t.me/${telegramUsername}?text=${encodedMsg}%20Session:%20{CHECKOUT_SESSION_ID}`
-                        : `${window.location.origin}/#/videos?offer_payment_success=true&session_id={CHECKOUT_SESSION_ID}`;
-                      const cancelUrl = `${window.location.origin}/#/videos?offer_payment_canceled=true`;
-                      const sessionId = await StripeService.createCheckoutSession(85, 'usd', 'All Content Offer', successUrl, cancelUrl);
-                      await StripeService.redirectToCheckout(sessionId);
-                    } catch (err) {
-                      console.error('Stripe checkout failed', err);
-                    } finally {
-                      setStripeLoading(false);
-                    }
-                  }}
-                  sx={{
-                    background: 'linear-gradient(90deg, #6A00FF 0%, #9B00FF 100%)',
-                    color: 'white',
-                    fontWeight: 'bold',
-                    px: 4,
-                    py: 2.2,
-                    borderRadius: '30px',
-                    textTransform: 'none',
-                    fontSize: { xs: '1rem', md: '1.2rem' },
-                    boxShadow: '0 10px 20px rgba(107, 0, 255, 0.35)',
-                    '&:hover': {
-                      background: 'linear-gradient(90deg, #5E00E6 0%, #8C00E6 100%)',
-                      transform: 'scale(1.05) translateY(-2px)'
-                    }
-                  }}
-                >
-                  {stripeLoading ? 'Processing…' : 'Pay $85'}
-                </Button>
-                <Typography variant="subtitle2" sx={{ color: 'white', fontWeight: 700, textShadow: '0 2px 6px rgba(0,0,0,0.35)' }}>
-                  Instant delivery after payment
-                </Typography>
-              </Box>
-            )}
-          </Box>
-        </Box>
-
+      {/* Banner de destaque */}
+      <FeaturedBanner onError={handleBannerError} />
+      
+      <Container maxWidth="lg" sx={{ py: 4 }}>
         {/* Status das Credenciais */}
         <CredentialsStatus />
         
@@ -548,53 +344,10 @@ Thanks!
             <Typography variant="h4" component="h2" gutterBottom>
               {videoListTitle || 'Featured Videos'}
             </Typography>
-            
-            {/* Filter Bar */}
-            <Box sx={{ mb: 2 }}>
-              <ToggleButtonGroup
-                value={selectedFilter}
-                exclusive
-                onChange={handleFilterChange}
-                aria-label="video filters"
-                size="small"
-                sx={{
-                  '& .MuiToggleButton-root': {
-                    border: '1px solid rgba(255, 15, 80, 0.3)',
-                    color: '#FF0F50',
-                    fontWeight: 'bold',
-                    px: 2,
-                    py: 0.5,
-                    '&.Mui-selected': {
-                      backgroundColor: '#FF0F50',
-                      color: 'white',
-                      '&:hover': {
-                        backgroundColor: '#D10D42',
-                      }
-                    },
-                    '&:hover': {
-                      backgroundColor: 'rgba(255, 15, 80, 0.1)',
-                    }
-                  }
-                }}
-              >
-                <ToggleButton value={SortOption.VIEWS_DESC} aria-label="most viewed">
-                  🔥 Most Viewed
-                </ToggleButton>
-                <ToggleButton value={SortOption.NEWEST} aria-label="recent">
-                  🆕 Recent
-                </ToggleButton>
-                <ToggleButton value={SortOption.PRICE_DESC} aria-label="expensive">
-                  💰 Expensive
-                </ToggleButton>
-                <ToggleButton value={SortOption.PRICE_ASC} aria-label="cheap">
-                  💸 Cheap
-                </ToggleButton>
-              </ToggleButtonGroup>
-            </Box>
-            {!loading && loadedVideos.length > 0 && (
+            {!loading && videos.length > 0 && (
               <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mt: 1, alignItems: 'center' }}>
                 <Chip 
-                  label={`From $${Math.min(...loadedVideos.map(v => v.price)).toFixed(2)}`}
+                  label={`From $${Math.min(...videos.map(v => v.price)).toFixed(2)}`}
                   size="small"
                   sx={{ 
                     backgroundColor: 'rgba(255, 15, 80, 0.1)',
@@ -604,7 +357,38 @@ Thanks!
                   }}
                 />
                 <Chip 
-                  label={`Up to $${Math.max(...loadedVideos.map(v => v.price)).toFixed(2)}`}
+                  label={`${sectionHappyCustomers}+ Happy Customers`}
+                  size="small"
+                  sx={{ 
+                    backgroundColor: 'rgba(76, 175, 80, 0.12)',
+                    color: '#2E7D32',
+                    fontWeight: 'bold',
+                    border: '1px solid rgba(76, 175, 80, 0.35)'
+                  }}
+                />
+                <Chip 
+                  label={`⭐ ${sectionRating}/5 Rating`}
+                  size="small"
+                  sx={{ 
+                    backgroundColor: 'rgba(255, 193, 7, 0.12)',
+                    color: '#B28704',
+                    fontWeight: 'bold',
+                    border: '1px solid rgba(255, 193, 7, 0.35)'
+                  }}
+                />
+                <Chip 
+                  label={`${sectionOnlineNow} online`}
+                  size="small"
+                  sx={{ 
+                    backgroundColor: 'rgba(244, 67, 54, 0.12)',
+                    color: '#D32F2F',
+                    fontWeight: 'bold',
+                    border: '1px solid rgba(244, 67, 54, 0.35)'
+                  }}
+                  icon={<span style={{ width: 8, height: 8, borderRadius: '50%', background: '#ff4d4f', display: 'inline-block', boxShadow: '0 0 0 2px rgba(255,77,79,0.2)' }} />}
+                />
+                <Chip 
+                  label={`Up to $${Math.max(...videos.map(v => v.price)).toFixed(2)}`}
                   size="small"
                   sx={{ 
                     backgroundColor: 'rgba(255, 15, 80, 0.1)',
@@ -614,7 +398,7 @@ Thanks!
                   }}
                 />
                 <Chip 
-                  label={`Avg: $${(loadedVideos.reduce((sum, v) => sum + v.price, 0) / loadedVideos.length).toFixed(2)}`}
+                  label={`Avg: $${(videos.reduce((sum, v) => sum + v.price, 0) / videos.length).toFixed(2)}`}
                   size="small"
                   sx={{ 
                     backgroundColor: 'rgba(255, 15, 80, 0.1)',
@@ -622,39 +406,12 @@ Thanks!
                     fontWeight: 'bold',
                     border: '1px solid rgba(255, 15, 80, 0.3)'
                   }}
-                />
-                <Chip 
-                  label="🔥 927+ Happy Customers"
-                  size="small"
-                  sx={{ 
-                    backgroundColor: 'rgba(76, 175, 80, 0.1)',
-                    color: '#4CAF50',
-                    fontWeight: 'bold',
-                    border: '1px solid rgba(76, 175, 80, 0.3)'
-                  }}
-                />
-                <Chip 
-                  label="⭐ 4.4/5 Rating"
-                  size="small"
-                  sx={{ 
-                    backgroundColor: 'rgba(255, 193, 7, 0.1)',
-                    color: '#FFC107',
-                    fontWeight: 'bold',
-                    border: '1px solid rgba(255, 193, 7, 0.3)'
-                  }}
-                />
-                
-                {/* Contador de usuários online */}
-                <OnlineUsersCounter 
-                  variant="chip" 
-                  size="small" 
-                  showDetails={true}
                 />
                 
                 {/* Loading progress indicator */}
-                {isLoadingMore && (
+                {isLoadingMore && loadedVideos.length < videos.length && (
                   <Chip 
-                    label={`Loading ${loadedVideos.length} videos...`}
+                    label={`Loading ${loadedVideos.length}/${videos.length} videos...`}
                     size="small"
                     sx={{ 
                       backgroundColor: 'rgba(33, 150, 243, 0.1)',
@@ -728,10 +485,10 @@ Thanks!
         <Fade in={true} timeout={500}>
           <Box>
             {loading ? (
-              <Grid container spacing={{ xs: 1.5, sm: 2, md: 3 }}>
+              <Grid container spacing={3}>
                 {renderSkeletons()}
               </Grid>
-            ) : loadedVideos.length === 0 && !isLoadingMore ? (
+            ) : videos.length === 0 && !isLoadingMore ? (
               <Grow in={true} timeout={1000}>
                 <Alert 
                   severity="info" 
@@ -748,7 +505,7 @@ Thanks!
               </Grow>
             ) : (
               <>
-                <Grid container spacing={{ xs: 1.25, sm: 2, md: 3 }}>
+                <Grid container spacing={3}>
                   {/* Show loaded videos with smooth animation */}
                   {loadedVideos.map((video, index) => (
                     <Grow

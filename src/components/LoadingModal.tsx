@@ -24,16 +24,14 @@ interface LoadingModalProps {
 }
 
 const LoadingModal: React.FC<LoadingModalProps> = ({ open, onClose }) => {
-  // Feature flag: modal ativado
-  const DISABLED = false;
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
-  const [timeLeft, setTimeLeft] = useState(6);
+  const [timeLeft, setTimeLeft] = useState(12);
 
   useEffect(() => {
     if (!open) return;
 
-    // Sempre aguardar 6 segundos completos, independentemente do estado de carregamento
+    // Sempre aguardar 12 segundos completos, independentemente do estado de carregamento
     const timer = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
@@ -49,7 +47,7 @@ const LoadingModal: React.FC<LoadingModalProps> = ({ open, onClose }) => {
 
   useEffect(() => {
     if (open) {
-      setTimeLeft(5);
+      setTimeLeft(4);
     }
   }, [open]);
 

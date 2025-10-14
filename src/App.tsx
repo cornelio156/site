@@ -12,6 +12,7 @@ import VideoPage from './pages/VideoPage';
 import Videoplayer from './pages/Videoplayer';
 import Admin from './pages/Admin';
 import Home from './pages/Home';
+import PaymentSuccess from './pages/PaymentSuccess';
 import Box from '@mui/material/Box';
 import Container from '@mui/material/Container';
 import Typography from '@mui/material/Typography';
@@ -22,7 +23,6 @@ import PrivacyNotice from './components/PrivacyNotice';
 import ScrollToTop from './components/ScrollToTop';
 import CustomAnalytics from './components/CustomAnalytics';
 import LoadingModal from './components/LoadingModal';
-import PaymentSuccessToast from './components/PaymentSuccessToast';
 
 // Componente AppContent para usar hooks que dependem do Router
 const AppContent: FC = () => {
@@ -100,7 +100,6 @@ const AppContent: FC = () => {
       {enableSplash && showSplash && <SplashAnimation onAnimationComplete={handleAnimationComplete} />}
       <PrivacyNotice />
       <PaymentNotifications />
-      <PaymentSuccessToast />
       <CustomAnalytics />
       <Header />
       <Box component="main" sx={{ flexGrow: 1 }}>
@@ -116,6 +115,9 @@ const AppContent: FC = () => {
           
           {/* Authentication */}
           <Route path="/login" element={<Login />} />
+          
+          {/* Payment Success */}
+          <Route path="/payment-success" element={<PaymentSuccess />} />
           
           {/* Admin area (protected) */}
           <Route 

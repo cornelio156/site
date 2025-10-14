@@ -116,6 +116,9 @@ const FeaturedBanner = ({ onError }: FeaturedBannerProps) => {
     return () => clearInterval(countdownInterval);
   }, []);
 
+  // Temporarily disabled
+  return null;
+  
   if (loading || !featuredVideo) {
     return null; // Or a skeleton loader
   }

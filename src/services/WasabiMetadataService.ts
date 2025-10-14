@@ -56,23 +56,13 @@ class WasabiMetadataService {
   private readonly METADATA_KEY = 'metadata/videosplus-data.json';
   private cache: any = null;
   private cacheTimestamp: number = 0;
-  private readonly CACHE_DURATION = 30 * 60 * 1000; // 30 minutos (mais agressivo)
-  private fallbackCache: any = null;
-  private fallbackTimestamp: number = 0;
-  private readonly FALLBACK_CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 horas
+  private readonly CACHE_DURATION = 30 * 1000; // 30 segundos
 
   // Verificar se o cache é válido
   private isCacheValid(): boolean {
     return this.cache !== null && 
            this.cacheTimestamp > 0 && 
            (Date.now() - this.cacheTimestamp) < this.CACHE_DURATION;
-  }
-
-  // Verificar se o fallback cache é válido
-  private isFallbackCacheValid(): boolean {
-    return this.fallbackCache !== null && 
-           this.fallbackTimestamp > 0 && 
-           (Date.now() - this.fallbackTimestamp) < this.FALLBACK_CACHE_DURATION;
   }
 
   // Limpar cache
@@ -204,25 +194,7 @@ class WasabiMetadataService {
       return this.cache;
     }
     
-    try {
-      const data = await this.loadDataFromWasabi();
-      // Salvar no fallback cache também
-      this.fallbackCache = data;
-      this.fallbackTimestamp = Date.now();
-      return data;
-    } catch (error) {
-      console.error('Error loading metadata from Wasabi, trying fallback cache:', error);
-      
-      // Se fallback cache é válido, usar ele
-      if (this.isFallbackCacheValid()) {
-        console.log('Using fallback cached metadata');
-        return this.fallbackCache;
-      }
-      
-      // Se não há fallback válido, retornar dados padrão
-      console.warn('No valid cache available, returning default data');
-      return this.getDefaultData();
-    }
+    return await this.loadDataFromWasabi();
   }
 
   // ===== VÍDEOS =====
